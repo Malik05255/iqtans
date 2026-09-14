@@ -6,7 +6,14 @@ import kotlin.math.roundToInt
 enum class PriceTrust { VERIFIED_LIVE, DISCOVERED, DEMO }
 enum class LiveSearchMode { LIVE, PARTIAL, UNCONFIGURED }
 
-data class ReviewSource(val source: String, val score: Double, val scale: Int, val count: Int)
+data class ReviewSource(
+    val source: String,
+    val score: Double,
+    val scale: Int,
+    val count: Int,
+    val attribution: String? = null,
+    val sourceUrl: String? = null
+)
 data class DiscoveryHint(val title: String, val url: String, val source: String, val description: String? = null)
 
 data class DealOffer(
@@ -89,7 +96,9 @@ data class SearchCoverage(
     val liveOffers: Int = 0,
     val discoveredLeads: Int = 0,
     val configuredProviderNames: List<String> = emptyList(),
-    val providerWarnings: List<String> = emptyList()
+    val providerWarnings: List<String> = emptyList(),
+    val reviewProvidersConfigured: Int = 0,
+    val externalReviewSources: Int = 0
 )
 
 data class LiveSearchEnvelope(
