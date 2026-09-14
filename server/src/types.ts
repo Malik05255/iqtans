@@ -13,6 +13,7 @@ export interface NormalizedOffer {
   roomName?: string; meal?: string; cancellation?: string; checkIn: string; checkOut: string; adults: number; rooms: number; totalPrice: number;
   breakdown: PriceBreakdown; strategyKind: StrategyKind; method: string; bookingUrl?: string; evidenceUrl?: string; verification: Verification;
   verifiedAt: string; matchPercent: number; requirements: string[];
+  comparisonPrice?: number; comparisonReason?: string;
 }
 export interface PromotionRule {
   id: string; title: string; sourceUrl: string; verifiedAt: string;

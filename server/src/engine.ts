@@ -8,9 +8,42 @@ function relatedLead(lead: DiscoveryLead, hotelName: string): boolean {
   return tokens.length > 0 && tokens.filter(t => text.includes(t)).length >= Math.min(2, tokens.length);
 }
 
+function productKey(offer: NormalizedOffer): string {
+  const room = normalizeHotelText(offer.roomName || "");
+  if (!room) return offer.id.split(":promo:")[0];
+  return [
+    offer.provider.toLowerCase(), offer.providerHotelId, room,
+    normalizeHotelText(offer.meal || ""), normalizeHotelText(offer.cancellation || ""),
+    offer.checkIn, offer.checkOut, offer.adults, offer.rooms
+  ].join("|");
+}
+
+export function withFairComparisonPrices(input: NormalizedOffer[]): NormalizedOffer[] {
+  const groups = new Map<string, NormalizedOffer[]>();
+  for (const offer of input) {
+    const key = productKey(offer);
+    const list = groups.get(key) ?? [];
+    list.push(offer);
+    groups.set(key, list);
+  }
+  return input.map(offer => {
+    const peers = groups.get(productKey(offer)) ?? [offer];
+    const standards = peers.filter(p => p.strategyKind === "STANDARD" && p.verification === "LIVE_VERIFIED");
+    const baseline = standards.length ? Math.min(...standards.map(p => p.totalPrice)) : offer.totalPrice;
+    return {
+      ...offer,
+      comparisonPrice: baseline,
+      comparisonReason: standards.length
+        ? "مقارنة مع أرخص سعر قياسي حي لنفس الغرفة والوجبة وسياسة الإلغاء لدى نفس مصدر الحجز"
+        : "لا يوجد خط أساس مطابق بالكامل؛ لا نحتسب توفيرًا لهذا العرض"
+    };
+  });
+}
+
 export function buildSearchResponse(request: SearchRequest, providerResults: ProviderResult[], discoveries: DiscoveryLead[]): SearchResponse {
   const rules = loadPromotionRules();
-  const offers = providerResults.flatMap(r => r.offers).flatMap(o => [o, ...applyVerifiedPromotions(o, rules, request.cards, request)]);
+  const rawOffers = providerResults.flatMap(r => r.offers).flatMap(o => [o, ...applyVerifiedPromotions(o, rules, request.cards, request)]);
+  const offers = withFairComparisonPrices(rawOffers);
   const groups = new Map<string, NormalizedOffer[]>();
   for (const offer of offers) {
     const key = hotelIdentityKey(offer.hotelName) || normalizeHotelText(offer.hotelName);
@@ -21,20 +54,20 @@ export function buildSearchResponse(request: SearchRequest, providerResults: Pro
 
   const hotels: RankedHotel[] = [...groups.entries()].map(([key, list]) => {
     const sorted = [...list].sort((a, b) => a.totalPrice - b.totalPrice);
-    const standard = sorted.filter(o => o.strategyKind === "STANDARD" && o.verification === "LIVE_VERIFIED");
-    const baseline = (standard.length ? standard : sorted).reduce((m, o) => Math.min(m, o.totalPrice), Number.POSITIVE_INFINITY);
-    const best = sorted[0]?.totalPrice ?? baseline;
+    const winner = sorted[0];
+    const baseline = winner?.comparisonPrice ?? winner?.totalPrice ?? 0;
+    const best = winner?.totalPrice ?? baseline;
     const savings = Math.max(0, baseline - best);
     return {
       key,
-      name: sorted[0].hotelName,
-      city: sorted[0].city,
+      name: winner.hotelName,
+      city: winner.city,
       baselinePrice: baseline,
       bestPrice: best,
       savings,
       savingsPercent: baseline > 0 ? Math.round(savings * 100 / baseline) : 0,
       offers: sorted,
-      discoveries: discoveries.filter(d => relatedLead(d, sorted[0].hotelName)).slice(0, 12)
+      discoveries: discoveries.filter(d => relatedLead(d, winner.hotelName)).slice(0, 12)
     };
   }).sort((a, b) => a.bestPrice - b.bestPrice);
 
@@ -48,6 +81,6 @@ export function buildSearchResponse(request: SearchRequest, providerResults: Pro
     mode,
     providers: providerResults.map(r => ({name: r.provider, configured: r.configured, warning: r.warning, latencyMs: r.latencyMs})),
     hotels,
-    disclaimer: "السعر المؤكد مرتبط بوقت آخر تحقق وبنفس التواريخ والنزلاء والغرفة والشروط. لا يُحتسب أي خصم إلا إذا كان من مصدر رسمي موثق وينطبق على فترة الحجز والإقامة والبطاقة والعملة وبلد المستخدم."
+    disclaimer: "السعر المؤكد مرتبط بوقت آخر تحقق وبنفس التواريخ والنزلاء والغرفة والشروط. رقم «وفّرت» لا يُحسب إلا مقابل خط أساس مطابق للغرفة والوجبة وسياسة الإلغاء، والعروض الرسمية يجب أن تطابق شروط الإقامة والبطاقة والعملة وبلد المستخدم."
   };
 }
