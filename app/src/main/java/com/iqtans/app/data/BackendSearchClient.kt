@@ -11,8 +11,7 @@ import kotlin.math.roundToInt
 
 class BackendSearchClient(private val baseUrl: String) {
     suspend fun search(request: SearchRequest, cards: List<UserPaymentCard>): LiveSearchEnvelope = withContext(Dispatchers.IO) {
-        val root = post("/v1/search", searchPayload(request, cards))
-        parseEnvelope(root)
+        parseEnvelope(post("/v1/search", searchPayload(request, cards)))
     }
 
     suspend fun verify(request: SearchRequest, cards: List<UserPaymentCard>, offer: DealOffer): OfferVerification = withContext(Dispatchers.IO) {
@@ -20,15 +19,15 @@ class BackendSearchClient(private val baseUrl: String) {
             put("search", searchPayload(request.copy(flexibilityDays = 0), cards))
             put("provider", offer.source)
             put("providerHotelId", offer.providerHotelId)
-            put("expectedPrice", offer.finalPrice)
+            put("expectedPrice", offer.finalAmount)
             offer.roomName?.takeIf { it.isNotBlank() }?.let { put("roomName", it) }
         }
         val root = post("/v1/verify", payload)
         val fresh = root.optJSONObject("offer")
         OfferVerification(
             available = root.optBoolean("available", false),
-            expectedPrice = root.optDouble("expectedPrice", offer.finalPrice.toDouble()).roundToInt(),
-            currentPrice = if (root.has("currentPrice")) root.optDouble("currentPrice").roundToInt() else null,
+            expectedPrice = root.optDouble("expectedPrice", offer.finalAmount),
+            currentPrice = root.optNullableDouble("currentPrice"),
             changed = root.optBoolean("changed", false),
             verifiedAt = root.optString("verifiedAt"),
             bookingUrl = fresh?.optString("bookingUrl")?.takeIf { it.isNotBlank() },
@@ -72,9 +71,9 @@ class BackendSearchClient(private val baseUrl: String) {
     private fun parseHotel(hotel: JSONObject): HotelDeal? {
         val rawOffers = hotel.optJSONArray("offers") ?: return null
         if (rawOffers.length() == 0) return null
-        val baseline = hotel.optDouble("baselinePrice", hotel.optDouble("bestPrice", 0.0)).roundToInt()
+        val baselineExact = hotel.optDouble("baselinePrice", hotel.optDouble("bestPrice", 0.0))
         val offers = mutableListOf<DealOffer>(); var firstRaw: JSONObject? = null
-        rawOffers.forEachObject { raw -> if (firstRaw == null) firstRaw = raw; offers += parseOffer(raw, baseline) }
+        rawOffers.forEachObject { raw -> if (firstRaw == null) firstRaw = raw; offers += parseOffer(raw, baselineExact) }
         if (offers.isEmpty()) return null
         val first = firstRaw ?: JSONObject(); val discoveries = mutableListOf<DiscoveryHint>()
         hotel.optJSONArray("discoveries")?.forEachObject { d ->
@@ -82,35 +81,37 @@ class BackendSearchClient(private val baseUrl: String) {
             if (url.isNotBlank()) discoveries += DiscoveryHint(d.optString("title", "عرض مكتشف"), url, d.optString("source", "الويب"), d.optString("description").takeIf { it.isNotBlank() })
         }
         val flexible = hotel.optJSONObject("flexible")
-        val flexibilitySaving = flexible?.optDouble("savings", 0.0)?.roundToInt() ?: 0
+        val flexibilitySavingExact = flexible?.optNullableDouble("savings") ?: 0.0
         val flexibleDateLabel = flexible?.let { val a = it.optString("checkIn"); val b = it.optString("checkOut"); if (a.isNotBlank() && b.isNotBlank()) "$a — $b" else null }
         val rating = first.optDouble("rating", 0.0); val ratingCount = first.optInt("ratingCount", 0); val provider = first.optString("provider", "مصدر حي")
         return HotelDeal(
             id = hotel.optString("key", hotel.optString("name")), name = hotel.optString("name", "فندق"), city = hotel.optString("city"), area = "نتيجة اقتنص الحية",
             stars = first.optInt("stars", 0).coerceIn(0, 5), rating = rating, ratingCount = ratingCount, distanceLabel = provider,
             reviewSources = if (rating > 0) listOf(ReviewSource(provider, rating, 10, ratingCount)) else emptyList(), offers = offers,
-            insight = discoveries.firstOrNull()?.title ?: offers.first().method, flexibilitySaving = flexibilitySaving, flexibleDateLabel = flexibleDateLabel, discoveries = discoveries
+            insight = discoveries.firstOrNull()?.title ?: offers.first().method,
+            flexibilitySaving = flexibilitySavingExact.roundToInt(), flexibleDateLabel = flexibleDateLabel, discoveries = discoveries, flexibilitySavingExact = flexibilitySavingExact
         )
     }
 
-    private fun parseOffer(raw: JSONObject, baseline: Int): DealOffer {
-        val total = raw.optDouble("totalPrice", 0.0).roundToInt(); val requirements = raw.optJSONArray("requirements").strings(); val breakdownObject = raw.optJSONObject("breakdown") ?: JSONObject()
+    private fun parseOffer(raw: JSONObject, baselineExact: Double): DealOffer {
+        val totalExact = raw.optDouble("totalPrice", 0.0); val requirements = raw.optJSONArray("requirements").strings(); val breakdownObject = raw.optJSONObject("breakdown") ?: JSONObject()
         val breakdown = buildList {
             val room = breakdownObject.optDouble("room", 0.0).roundToInt(); val taxes = breakdownObject.optDouble("taxes", 0.0).roundToInt(); val fees = breakdownObject.optDouble("mandatoryFees", 0.0).roundToInt(); val property = breakdownObject.optDouble("payAtProperty", 0.0).roundToInt()
             if (room > 0) add("سعر الإقامة الأساسي" to room); if (taxes > 0) add("ضرائب" to taxes); if (fees > 0) add("ضرائب/رسوم إلزامية ضمن الإجمالي" to fees); if (property > 0) add("من الإجمالي يُدفع في الفندق" to property)
         }
         val strategy = raw.optString("strategyKind", "STANDARD"); val title = when (strategy) { "CARD" -> "اقتـناص ببطاقتك"; "MEMBER" -> "سعر أعضاء"; "APP" -> "سعر التطبيق"; "PROMO" -> "عرض موثق"; "PACKAGE" -> "تركيبة توفير"; else -> "سعر مباشر" }
         val verification = raw.optString("verification"); val source = raw.optString("provider", "مصدر الحجز")
-        val steps = buildList { add("افتح مصدر الحجز: $source."); addAll(requirements); add("تأكد أن نفس الفندق والتواريخ والغرفة والسياسات ما زالت مطابقة قبل الدفع."); add("تحقق من أن الإجمالي النهائي الظاهر لا يتجاوز $total ${breakdownObject.optString("currency", "SAR")}.") }
+        val steps = buildList { add("افتح مصدر الحجز: $source."); addAll(requirements); add("تأكد أن نفس الفندق والتواريخ والغرفة والسياسات ما زالت مطابقة قبل الدفع."); add("تحقق من أن الإجمالي النهائي الظاهر لا يتجاوز ${formatMoney(totalExact)} ${breakdownObject.optString("currency", "SAR")}.") }
         return DealOffer(
-            id = raw.optString("id"), source = source, finalPrice = total, referencePrice = if (baseline > 0) baseline else total, currency = breakdownObject.optString("currency", "SAR"),
+            id = raw.optString("id"), source = source, finalPrice = totalExact.roundToInt(), referencePrice = baselineExact.roundToInt(), currency = breakdownObject.optString("currency", "SAR"),
             title = title, method = raw.optString("method", source), trust = if (verification == "LIVE_VERIFIED") PriceTrust.VERIFIED_LIVE else PriceTrust.DISCOVERED,
             matchPercent = raw.optInt("matchPercent", 100), lastChecked = raw.optString("verifiedAt", "تحقق حديث"), cancellation = raw.optString("cancellation", "راجع سياسة الإلغاء"), meal = raw.optString("meal", "حسب العرض"),
             conditions = requirements, steps = steps, breakdown = breakdown, cardRequirement = requirements.firstOrNull { it.contains("بطاقة") }, memberRequirement = requirements.firstOrNull { it.contains("عضوية") || it.contains("حساب") },
-            bookingUrl = raw.optString("bookingUrl").takeIf { it.isNotBlank() }, evidenceUrl = raw.optString("evidenceUrl").takeIf { it.isNotBlank() },
-            providerHotelId = raw.optString("providerHotelId"), roomName = raw.optString("roomName").takeIf { it.isNotBlank() }
+            bookingUrl = raw.optString("bookingUrl").takeIf { it.isNotBlank() }, evidenceUrl = raw.optString("evidenceUrl").takeIf { it.isNotBlank() }, providerHotelId = raw.optString("providerHotelId"), roomName = raw.optString("roomName").takeIf { it.isNotBlank() },
+            finalPriceExact = totalExact, referencePriceExact = baselineExact
         )
     }
 }
 private inline fun JSONArray.forEachObject(block: (JSONObject) -> Unit) { for (i in 0 until length()) optJSONObject(i)?.let(block) }
 private fun JSONArray?.strings(): List<String> = if (this == null) emptyList() else buildList { for (i in 0 until length()) optString(i).takeIf { it.isNotBlank() }?.let(::add) }
+private fun JSONObject.optNullableDouble(name: String): Double? = if (has(name) && !isNull(name)) optDouble(name) else null

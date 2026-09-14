@@ -1,6 +1,7 @@
 package com.iqtans.app.domain
 
 import java.time.LocalDate
+import kotlin.math.roundToInt
 
 enum class PriceTrust { VERIFIED_LIVE, DISCOVERED, DEMO }
 enum class LiveSearchMode { LIVE, PARTIAL, UNCONFIGURED }
@@ -30,10 +31,15 @@ data class DealOffer(
     val bookingUrl: String? = null,
     val evidenceUrl: String? = null,
     val providerHotelId: String = "",
-    val roomName: String? = null
+    val roomName: String? = null,
+    val finalPriceExact: Double? = null,
+    val referencePriceExact: Double? = null
 ) {
-    val savings: Int get() = (referencePrice - finalPrice).coerceAtLeast(0)
-    val savingsPercent: Int get() = if (referencePrice <= 0) 0 else (savings * 100 / referencePrice)
+    val finalAmount: Double get() = finalPriceExact ?: finalPrice.toDouble()
+    val referenceAmount: Double get() = referencePriceExact ?: referencePrice.toDouble()
+    val savingsAmount: Double get() = (referenceAmount - finalAmount).coerceAtLeast(0.0)
+    val savings: Int get() = savingsAmount.roundToInt()
+    val savingsPercent: Int get() = if (referenceAmount <= 0.0) 0 else (savingsAmount * 100.0 / referenceAmount).roundToInt()
 }
 
 data class HotelDeal(
@@ -50,8 +56,12 @@ data class HotelDeal(
     val insight: String,
     val flexibilitySaving: Int = 0,
     val flexibleDateLabel: String? = null,
-    val discoveries: List<DiscoveryHint> = emptyList()
-) { val bestOffer: DealOffer get() = offers.minBy { it.finalPrice } }
+    val discoveries: List<DiscoveryHint> = emptyList(),
+    val flexibilitySavingExact: Double? = null
+) {
+    val bestOffer: DealOffer get() = offers.minBy { it.finalAmount }
+    val flexibilitySavingAmount: Double get() = flexibilitySavingExact ?: flexibilitySaving.toDouble()
+}
 
 data class UserPaymentCard(val id: String, val bank: String, val network: String, val tier: String, val isEnabled: Boolean = true)
 
@@ -69,8 +79,8 @@ data class LiveSearchEnvelope(val hotels: List<HotelDeal>, val mode: LiveSearchM
 
 data class OfferVerification(
     val available: Boolean,
-    val expectedPrice: Int,
-    val currentPrice: Int? = null,
+    val expectedPrice: Double,
+    val currentPrice: Double? = null,
     val changed: Boolean = false,
     val verifiedAt: String = "",
     val bookingUrl: String? = null,
