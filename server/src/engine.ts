@@ -8,12 +8,19 @@ function relatedLead(lead: DiscoveryLead, hotelName: string): boolean {
   return tokens.length > 0 && tokens.filter(t => text.includes(t)).length >= Math.min(2, tokens.length);
 }
 
+function paymentMode(offer: NormalizedOffer): string {
+  const atProperty = Math.max(0, Number(offer.breakdown.payAtProperty || 0));
+  if (atProperty <= 0.009) return "ONLINE";
+  if (atProperty >= offer.totalPrice - 0.009) return "PROPERTY";
+  return "SPLIT";
+}
+
 function productKey(offer: NormalizedOffer): string {
   const room = normalizeHotelText(offer.roomName || "");
-  if (!room) return offer.id.split(":promo:")[0];
+  if (!room) return `${offer.id.split(":promo:")[0]}|${paymentMode(offer)}`;
   return [
     offer.provider.toLowerCase(), offer.providerHotelId, room,
-    normalizeHotelText(offer.meal || ""), normalizeHotelText(offer.cancellation || ""),
+    normalizeHotelText(offer.meal || ""), normalizeHotelText(offer.cancellation || ""), paymentMode(offer),
     offer.checkIn, offer.checkOut, offer.adults, offer.rooms
   ].join("|");
 }
@@ -55,7 +62,7 @@ export function withFairComparisonPrices(input: NormalizedOffer[]): NormalizedOf
       ...offer,
       comparisonPrice: baseline,
       comparisonReason: standards.length
-        ? "مقارنة مع أرخص سعر قياسي حي لنفس الغرفة والوجبة وسياسة الإلغاء لدى نفس مصدر الحجز"
+        ? "مقارنة مع أرخص سعر قياسي حي لنفس الغرفة والوجبة وسياسة الإلغاء وطريقة الدفع لدى نفس مصدر الحجز"
         : "لا يوجد خط أساس مطابق بالكامل؛ لا نحتسب توفيرًا لهذا العرض"
     };
   });
@@ -111,6 +118,6 @@ export function buildSearchResponse(request: SearchRequest, providerResults: Pro
       discoveredLeads: discoveries.length
     },
     hotels,
-    disclaimer: "السعر المؤكد مرتبط بوقت آخر تحقق وبنفس التواريخ والنزلاء والغرفة والشروط. رقم «وفّرت» لا يُحسب إلا مقابل خط أساس مطابق للغرفة والوجبة وسياسة الإلغاء، والعروض الرسمية يجب أن تطابق شروط الإقامة والبطاقة والعملة وبلد المستخدم."
+    disclaimer: "السعر المؤكد مرتبط بوقت آخر تحقق وبنفس التواريخ والنزلاء والغرفة والشروط. رقم «وفّرت» لا يُحسب إلا مقابل خط أساس مطابق للغرفة والوجبة وسياسة الإلغاء وطريقة الدفع، والعروض الرسمية يجب أن تطابق شروط الإقامة والبطاقة والعملة وبلد المستخدم."
   };
 }
