@@ -73,6 +73,7 @@ export function buildSearchResponse(request: SearchRequest, providerResults: Pro
 
   const configured = providerResults.filter(r => r.configured);
   const successful = configured.filter(r => r.offers.length > 0 && !r.warning);
+  const liveOffers = providerResults.flatMap(r => r.offers).filter(o => o.verification === "LIVE_VERIFIED").length;
   const mode: SearchResponse["mode"] = configured.length === 0 ? "unconfigured" : successful.length === configured.length ? "live" : "partial";
 
   return {
@@ -80,6 +81,13 @@ export function buildSearchResponse(request: SearchRequest, providerResults: Pro
     generatedAt: new Date().toISOString(),
     mode,
     providers: providerResults.map(r => ({name: r.provider, configured: r.configured, warning: r.warning, latencyMs: r.latencyMs})),
+    coverage: {
+      priceProvidersTotal: providerResults.length,
+      priceProvidersConfigured: configured.length,
+      priceProvidersWithResults: providerResults.filter(r => r.configured && r.offers.length > 0).length,
+      liveOffers,
+      discoveredLeads: discoveries.length
+    },
     hotels,
     disclaimer: "السعر المؤكد مرتبط بوقت آخر تحقق وبنفس التواريخ والنزلاء والغرفة والشروط. رقم «وفّرت» لا يُحسب إلا مقابل خط أساس مطابق للغرفة والوجبة وسياسة الإلغاء، والعروض الرسمية يجب أن تطابق شروط الإقامة والبطاقة والعملة وبلد المستخدم."
   };

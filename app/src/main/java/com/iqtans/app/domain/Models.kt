@@ -81,5 +81,20 @@ data class PriceWatch(
     )
 }
 
-data class LiveSearchEnvelope(val hotels: List<HotelDeal>, val mode: LiveSearchMode, val warnings: List<String> = emptyList(), val generatedAt: String = "")
+data class SearchCoverage(
+    val priceProvidersTotal: Int = 0,
+    val priceProvidersConfigured: Int = 0,
+    val priceProvidersWithResults: Int = 0,
+    val liveOffers: Int = 0,
+    val discoveredLeads: Int = 0
+)
+
+data class LiveSearchEnvelope(
+    val hotels: List<HotelDeal>,
+    val mode: LiveSearchMode,
+    val warnings: List<String> = emptyList(),
+    val generatedAt: String = "",
+    val coverage: SearchCoverage = SearchCoverage()
+)
+
 data class OfferVerification(val available: Boolean, val expectedPrice: Double, val currentPrice: Double? = null, val changed: Boolean = false, val verifiedAt: String = "", val bookingUrl: String? = null, val reason: String? = null)

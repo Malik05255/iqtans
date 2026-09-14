@@ -43,7 +43,7 @@ class BackendSearchClient(private val baseUrl: String) {
         put("adults", request.guests)
         put("rooms", request.rooms)
         if (request.childrenAges.isNotEmpty()) {
-            put("childrenAges", JSONArray().apply { request.childrenAges.forEach(::put) })
+            put("childrenAges", JSONArray().apply { request.childrenAges.forEach { age -> put(age) } })
         }
         put("bookerCountry", "sa")
         put("currency", "SAR")
@@ -80,7 +80,15 @@ class BackendSearchClient(private val baseUrl: String) {
         root.optJSONArray("providers")?.forEachObject { p -> p.optString("warning").takeIf { it.isNotBlank() }?.let(warnings::add) }
         val hotels = mutableListOf<HotelDeal>()
         root.optJSONArray("hotels")?.forEachObject { hotel -> parseHotel(hotel)?.let(hotels::add) }
-        return LiveSearchEnvelope(hotels, mode, warnings, root.optString("generatedAt"))
+        val coverageObject = root.optJSONObject("coverage") ?: JSONObject()
+        val coverage = SearchCoverage(
+            priceProvidersTotal = coverageObject.optInt("priceProvidersTotal", 0),
+            priceProvidersConfigured = coverageObject.optInt("priceProvidersConfigured", 0),
+            priceProvidersWithResults = coverageObject.optInt("priceProvidersWithResults", 0),
+            liveOffers = coverageObject.optInt("liveOffers", 0),
+            discoveredLeads = coverageObject.optInt("discoveredLeads", 0)
+        )
+        return LiveSearchEnvelope(hotels, mode, warnings, root.optString("generatedAt"), coverage)
     }
 
     private fun parseHotel(hotel: JSONObject): HotelDeal? {

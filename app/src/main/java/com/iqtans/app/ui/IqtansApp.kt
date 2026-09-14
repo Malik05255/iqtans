@@ -100,6 +100,7 @@ fun IqtansApp(repository: DealRepository, liveClient: BackendSearchClient? = nul
     val liveResults = liveEnvelope?.hotels.orEmpty()
     val results = if (liveResults.isNotEmpty()) liveResults else fallbackResults
     val isLive = liveEnvelope?.mode == LiveSearchMode.LIVE || liveEnvelope?.mode == LiveSearchMode.PARTIAL
+    val coverage = liveEnvelope?.coverage ?: SearchCoverage()
     val selectedHotel = selectedHotelId?.let { id -> hotelSnapshots[id] ?: results.firstOrNull { it.id == id } ?: repository.getHotel(id) }
     val selectedOffer = selectedHotel?.offers?.firstOrNull { it.id == selectedOfferId }
 
@@ -146,6 +147,7 @@ fun IqtansApp(repository: DealRepository, liveClient: BackendSearchClient? = nul
                         request = request,
                         hotels = results,
                         isLive = isLive,
+                        coverage = coverage,
                         onBack = { screenName = AppScreen.HOME.name },
                         onHotelClick = ::selectHotel
                     )

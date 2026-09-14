@@ -33,9 +33,18 @@ export interface RankedHotel {
   key: string; name: string; city: string; baselinePrice: number; bestPrice: number; savings: number; savingsPercent: number;
   offers: NormalizedOffer[]; discoveries: DiscoveryLead[]; flexible?: FlexibleDateOption;
 }
+export interface SearchCoverage {
+  priceProvidersTotal: number;
+  priceProvidersConfigured: number;
+  priceProvidersWithResults: number;
+  liveOffers: number;
+  discoveredLeads: number;
+}
 export interface SearchResponse {
   request: SearchRequest; generatedAt: string; mode: "live" | "partial" | "unconfigured";
-  providers: Array<{name: string; configured: boolean; warning?: string; latencyMs: number}>; hotels: RankedHotel[]; disclaimer: string;
+  providers: Array<{name: string; configured: boolean; warning?: string; latencyMs: number}>;
+  coverage: SearchCoverage;
+  hotels: RankedHotel[]; disclaimer: string;
 }
 export interface VerifyRequest {
   search: SearchRequest;
