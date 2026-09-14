@@ -43,8 +43,12 @@ data class SearchRequest(
     val checkOut: String = LocalDate.now().plusDays(10).toString(),
     val guests: Int = 2,
     val rooms: Int = 1,
-    val flexibilityDays: Int = 1
-)
+    val flexibilityDays: Int = 1,
+    val childrenAges: List<Int> = emptyList()
+) {
+    val adults: Int get() = guests
+    val totalGuests: Int get() = guests + childrenAges.size
+}
 
 data class PriceWatch(
     val id: String,
@@ -62,9 +66,19 @@ data class PriceWatch(
     val lastNotifiedPrice: Double? = null,
     val currency: String,
     val savedAt: Long,
-    val lastCheckedAt: Long = 0L
+    val lastCheckedAt: Long = 0L,
+    val childrenAges: List<Int> = emptyList()
 ) {
-    fun toSearchRequest() = SearchRequest(city = city, hotelQuery = hotelName, checkIn = checkIn, checkOut = checkOut, guests = guests, rooms = rooms, flexibilityDays = 1)
+    fun toSearchRequest() = SearchRequest(
+        city = city,
+        hotelQuery = hotelName,
+        checkIn = checkIn,
+        checkOut = checkOut,
+        guests = guests,
+        rooms = rooms,
+        flexibilityDays = 1,
+        childrenAges = childrenAges
+    )
 }
 
 data class LiveSearchEnvelope(val hotels: List<HotelDeal>, val mode: LiveSearchMode, val warnings: List<String> = emptyList(), val generatedAt: String = "")

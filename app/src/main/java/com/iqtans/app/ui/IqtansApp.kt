@@ -76,7 +76,12 @@ fun IqtansApp(repository: DealRepository, liveClient: BackendSearchClient? = nul
         val envelope = liveEnvelope ?: return@LaunchedEffect
         val now = System.currentTimeMillis()
         val refreshed = watches.map { watch ->
-            val sameSearch = watch.city == request.city && watch.checkIn == request.checkIn && watch.checkOut == request.checkOut && watch.guests == request.guests && watch.rooms == request.rooms
+            val sameSearch = watch.city == request.city &&
+                watch.checkIn == request.checkIn &&
+                watch.checkOut == request.checkOut &&
+                watch.guests == request.guests &&
+                watch.rooms == request.rooms &&
+                watch.childrenAges == request.childrenAges
             if (!sameSearch) return@map watch
             val hotel = envelope.hotels.firstOrNull { it.id == watch.hotelId }
                 ?: envelope.hotels.firstOrNull { it.name.equals(watch.hotelName, ignoreCase = true) }
@@ -105,7 +110,10 @@ fun IqtansApp(repository: DealRepository, liveClient: BackendSearchClient? = nul
         screenName = AppScreen.HOTEL.name
     }
 
-    fun watchId(hotel: HotelDeal) = "${hotel.id}|${request.checkIn}|${request.checkOut}|${request.guests}|${request.rooms}"
+    fun watchId(hotel: HotelDeal): String {
+        val childKey = request.childrenAges.joinToString(",")
+        return "${hotel.id}|${request.checkIn}|${request.checkOut}|${request.guests}|$childKey|${request.rooms}"
+    }
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Scaffold(
@@ -172,7 +180,8 @@ fun IqtansApp(repository: DealRepository, liveClient: BackendSearchClient? = nul
                                             lastSeenPrice = price,
                                             bestSeenPrice = price,
                                             currency = hotel.bestOffer.currency,
-                                            savedAt = System.currentTimeMillis()
+                                            savedAt = System.currentTimeMillis(),
+                                            childrenAges = request.childrenAges
                                         )
                                     }
                                 },

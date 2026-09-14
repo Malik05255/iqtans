@@ -38,10 +38,25 @@ class BackendSearchClient(private val baseUrl: String) {
     private fun searchPayload(request: SearchRequest, cards: List<UserPaymentCard>) = JSONObject().apply {
         put("city", request.city)
         if (request.hotelQuery.isNotBlank()) put("hotelName", request.hotelQuery)
-        put("checkIn", request.checkIn); put("checkOut", request.checkOut); put("adults", request.guests); put("rooms", request.rooms)
-        put("bookerCountry", "sa"); put("currency", "SAR"); put("flexibilityDays", request.flexibilityDays)
+        put("checkIn", request.checkIn)
+        put("checkOut", request.checkOut)
+        put("adults", request.guests)
+        put("rooms", request.rooms)
+        if (request.childrenAges.isNotEmpty()) {
+            put("childrenAges", JSONArray().apply { request.childrenAges.forEach(::put) })
+        }
+        put("bookerCountry", "sa")
+        put("currency", "SAR")
+        put("flexibilityDays", request.flexibilityDays)
         put("cards", JSONArray().apply {
-            cards.filter { it.isEnabled }.forEach { card -> put(JSONObject().apply { put("bank", card.bank); put("network", card.network); put("tier", card.tier); put("country", "SA") }) }
+            cards.filter { it.isEnabled }.forEach { card ->
+                put(JSONObject().apply {
+                    put("bank", card.bank)
+                    put("network", card.network)
+                    put("tier", card.tier)
+                    put("country", "SA")
+                })
+            }
         })
     }
 

@@ -68,7 +68,7 @@ fun WatchlistScreen(
         item {
             Text("مراقبة الأسعار", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
             Spacer(Modifier.height(5.dp))
-            Text("اقتنص يعيد الفحص دوريًا عند توفر الإنترنت. السعر المخزن لا يُعتبر حيًا حتى آخر تحقق.", color = Muted, style = MaterialTheme.typography.bodyMedium)
+            Text("اقتنص يعيد الفحص دوريًا بنفس التواريخ والبالغين وأعمار الأطفال والغرف. السعر المخزن لا يُعتبر حيًا حتى آخر تحقق.", color = Muted, style = MaterialTheme.typography.bodyMedium)
         }
 
         if (watches.isEmpty()) {
@@ -101,7 +101,7 @@ fun WatchlistScreen(
                             Column(Modifier.weight(1f)) {
                                 Text(watch.hotelName, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
                                 Text("${watch.city} • ${watch.checkIn} — ${watch.checkOut}", color = Muted, style = MaterialTheme.typography.bodyMedium)
-                                Text("${watch.guests} نزلاء • ${watch.rooms} غرفة", color = Muted, style = MaterialTheme.typography.labelMedium)
+                                Text(occupancyLabel(watch), color = Muted, style = MaterialTheme.typography.labelMedium)
                             }
                             IconButton(onClick = { onDelete(watch) }) { Icon(Icons.Rounded.DeleteOutline, "حذف", tint = Muted) }
                         }
@@ -150,6 +150,15 @@ fun WatchlistScreen(
             }
         }
     }
+}
+
+private fun occupancyLabel(watch: PriceWatch): String {
+    val children = if (watch.childrenAges.isEmpty()) {
+        "بدون أطفال"
+    } else {
+        "${watch.childrenAges.size} أطفال (${watch.childrenAges.joinToString("، ")} سنة)"
+    }
+    return "${watch.guests} بالغ • $children • ${watch.rooms} غرفة"
 }
 
 @Composable

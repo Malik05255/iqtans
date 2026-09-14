@@ -56,7 +56,8 @@ class LocalPreferences(context: Context) {
             lastNotifiedPrice = optionalDouble(o, "lastNotifiedPrice"),
             currency = o.optString("currency", "SAR"),
             savedAt = o.optLong("savedAt", 0L),
-            lastCheckedAt = o.optLong("lastCheckedAt", 0L)
+            lastCheckedAt = o.optLong("lastCheckedAt", 0L),
+            childrenAges = intList(o.optJSONArray("childrenAges")).filter { it in 0..17 }
         )
     }
 
@@ -72,6 +73,7 @@ class LocalPreferences(context: Context) {
                 put("checkOut", w.checkOut)
                 put("guests", w.guests)
                 put("rooms", w.rooms)
+                put("childrenAges", JSONArray().apply { w.childrenAges.forEach(::put) })
                 put("savedPrice", w.savedPrice)
                 put("lastSeenPrice", w.lastSeenPrice)
                 put("bestSeenPrice", w.bestSeenPrice)
@@ -83,6 +85,11 @@ class LocalPreferences(context: Context) {
             })
         }
         prefs.edit().putString("watches", array.toString()).apply()
+    }
+
+    private fun intList(array: JSONArray?): List<Int> {
+        if (array == null) return emptyList()
+        return buildList { for (i in 0 until array.length()) add(array.optInt(i, -1)) }
     }
 
     private fun optionalDouble(o: JSONObject, key: String): Double? {

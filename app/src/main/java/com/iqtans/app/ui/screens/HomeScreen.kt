@@ -39,8 +39,9 @@ fun HomeScreen(
     var flexibility by remember { mutableIntStateOf(1) }
     var checkIn by remember { mutableStateOf(today.plusDays(7)) }
     var checkOut by remember { mutableStateOf(today.plusDays(10)) }
-    var guests by remember { mutableIntStateOf(2) }
+    var adults by remember { mutableIntStateOf(2) }
     var rooms by remember { mutableIntStateOf(1) }
+    var childrenAges by remember { mutableStateOf<List<Int>>(emptyList()) }
     var pickerTarget by remember { mutableStateOf<PickerTarget?>(null) }
 
     pickerTarget?.let { target ->
@@ -104,21 +105,65 @@ fun HomeScreen(
                     }
                     Spacer(Modifier.height(10.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        CounterTile("النزلاء", guests, 1, 12, Icons.Rounded.Group, Modifier.weight(1f)) { guests = it }
-                        CounterTile("الغرف", rooms, 1, 8, Icons.Rounded.MeetingRoom, Modifier.weight(1f)) { rooms = it }
+                        CounterTile("البالغون", adults, 1, 12, Icons.Rounded.Person, Modifier.weight(1f)) { adults = it }
+                        CounterTile("الأطفال", childrenAges.size, 0, 6, Icons.Rounded.ChildCare, Modifier.weight(1f)) { count ->
+                            childrenAges = when {
+                                count > childrenAges.size -> childrenAges + List(count - childrenAges.size) { 7 }
+                                count < childrenAges.size -> childrenAges.take(count)
+                                else -> childrenAges
+                            }
+                        }
                     }
+                    Spacer(Modifier.height(10.dp))
+                    CounterTile("الغرف", rooms, 1, 8, Icons.Rounded.MeetingRoom, Modifier.fillMaxWidth()) { rooms = it }
+
+                    if (childrenAges.isNotEmpty()) {
+                        Spacer(Modifier.height(14.dp))
+                        Surface(color = SoftSand, shape = RoundedCornerShape(18.dp)) {
+                            Column(Modifier.fillMaxWidth().padding(13.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Rounded.Info, null, tint = Night, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(7.dp))
+                                    Text("حدد عمر كل طفل — العمر قد يغيّر السعر وسياسة الإشغال", color = Night, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                }
+                                childrenAges.forEachIndexed { index, age ->
+                                    ChildAgeRow(index = index, age = age) { newAge ->
+                                        childrenAges = childrenAges.toMutableList().also { it[index] = newAge }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     Spacer(Modifier.height(15.dp))
                     Text("مرونة التواريخ", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf(0 to "ثابتة", 1 to "± يوم", 3 to "± 3 أيام").forEach { (days, label) ->
-                            FilterChip(selected = flexibility == days, onClick = { flexibility = days }, label = { Text(label) },
-                                leadingIcon = if (flexibility == days) {{ Icon(Icons.Rounded.Check, null, modifier = Modifier.size(16.dp)) }} else null)
+                            FilterChip(
+                                selected = flexibility == days,
+                                onClick = { flexibility = days },
+                                label = { Text(label) },
+                                leadingIcon = if (flexibility == days) {{ Icon(Icons.Rounded.Check, null, modifier = Modifier.size(16.dp)) }} else null
+                            )
                         }
                     }
                     Spacer(Modifier.height(16.dp))
                     Button(
-                        onClick = { onSearch(SearchRequest(city, hotelQuery, checkIn.toString(), checkOut.toString(), guests, rooms, flexibility)) },
+                        onClick = {
+                            onSearch(
+                                SearchRequest(
+                                    city = city,
+                                    hotelQuery = hotelQuery,
+                                    checkIn = checkIn.toString(),
+                                    checkOut = checkOut.toString(),
+                                    guests = adults,
+                                    rooms = rooms,
+                                    flexibilityDays = flexibility,
+                                    childrenAges = childrenAges
+                                )
+                            )
+                        },
                         modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(18.dp)
                     ) {
                         Icon(Icons.Rounded.Search, null); Spacer(Modifier.width(8.dp)); Text("ابدأ الاقتناص", fontWeight = FontWeight.Black)
@@ -167,6 +212,18 @@ private fun CounterTile(label: String, value: Int, min: Int, max: Int, icon: and
                 Text(value.toString(), fontWeight = FontWeight.Black)
                 IconButton(onClick = { if (value < max) onChange(value + 1) }, enabled = value < max) { Icon(Icons.Rounded.Add, null) }
             }
+        }
+    }
+}
+
+@Composable
+private fun ChildAgeRow(index: Int, age: Int, onAgeChange: (Int) -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(14.dp)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("الطفل ${index + 1}", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold)
+            IconButton(onClick = { if (age > 0) onAgeChange(age - 1) }, enabled = age > 0) { Icon(Icons.Rounded.Remove, null) }
+            Text("$age سنة", modifier = Modifier.widthIn(min = 54.dp), fontWeight = FontWeight.Black, color = Emerald)
+            IconButton(onClick = { if (age < 17) onAgeChange(age + 1) }, enabled = age < 17) { Icon(Icons.Rounded.Add, null) }
         }
     }
 }
