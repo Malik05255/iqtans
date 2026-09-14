@@ -14,8 +14,8 @@ android {
         applicationId = "com.iqtans.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.2.0"
+        versionCode = 2
+        versionName = "0.3.0"
 
         vectorDrawables { useSupportLibrary = true }
         buildConfigField("String", "IQTANS_API_BASE_URL", "\"$escapedApiBaseUrl\"")
@@ -48,6 +48,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("androidx.work:work-runtime-ktx:2.11.2")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

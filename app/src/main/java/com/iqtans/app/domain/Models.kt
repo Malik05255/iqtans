@@ -55,9 +55,14 @@ data class PriceWatch(
     val checkOut: String,
     val guests: Int,
     val rooms: Int,
+    val savedPrice: Double,
     val lastSeenPrice: Double,
+    val bestSeenPrice: Double,
+    val targetPrice: Double? = null,
+    val lastNotifiedPrice: Double? = null,
     val currency: String,
-    val savedAt: Long
+    val savedAt: Long,
+    val lastCheckedAt: Long = 0L
 ) {
     fun toSearchRequest() = SearchRequest(city = city, hotelQuery = hotelName, checkIn = checkIn, checkOut = checkOut, guests = guests, rooms = rooms, flexibilityDays = 1)
 }
