@@ -10,30 +10,12 @@ data class ReviewSource(val source: String, val score: Double, val scale: Int, v
 data class DiscoveryHint(val title: String, val url: String, val source: String, val description: String? = null)
 
 data class DealOffer(
-    val id: String,
-    val source: String,
-    val finalPrice: Int,
-    val referencePrice: Int,
-    val currency: String = "ر.س",
-    val title: String,
-    val method: String,
-    val trust: PriceTrust,
-    val matchPercent: Int,
-    val lastChecked: String,
-    val cancellation: String,
-    val meal: String,
-    val conditions: List<String> = emptyList(),
-    val steps: List<String> = emptyList(),
-    val breakdown: List<Pair<String, Int>> = emptyList(),
-    val cardRequirement: String? = null,
-    val memberRequirement: String? = null,
-    val cashbackLater: Int = 0,
-    val bookingUrl: String? = null,
-    val evidenceUrl: String? = null,
-    val providerHotelId: String = "",
-    val roomName: String? = null,
-    val finalPriceExact: Double? = null,
-    val referencePriceExact: Double? = null
+    val id: String, val source: String, val finalPrice: Int, val referencePrice: Int, val currency: String = "ر.س",
+    val title: String, val method: String, val trust: PriceTrust, val matchPercent: Int, val lastChecked: String,
+    val cancellation: String, val meal: String, val conditions: List<String> = emptyList(), val steps: List<String> = emptyList(),
+    val breakdown: List<Pair<String, Int>> = emptyList(), val cardRequirement: String? = null, val memberRequirement: String? = null,
+    val cashbackLater: Int = 0, val bookingUrl: String? = null, val evidenceUrl: String? = null, val providerHotelId: String = "",
+    val roomName: String? = null, val finalPriceExact: Double? = null, val referencePriceExact: Double? = null
 ) {
     val finalAmount: Double get() = finalPriceExact ?: finalPrice.toDouble()
     val referenceAmount: Double get() = referencePriceExact ?: referencePrice.toDouble()
@@ -43,20 +25,9 @@ data class DealOffer(
 }
 
 data class HotelDeal(
-    val id: String,
-    val name: String,
-    val city: String,
-    val area: String,
-    val stars: Int,
-    val rating: Double,
-    val ratingCount: Int,
-    val distanceLabel: String,
-    val reviewSources: List<ReviewSource>,
-    val offers: List<DealOffer>,
-    val insight: String,
-    val flexibilitySaving: Int = 0,
-    val flexibleDateLabel: String? = null,
-    val discoveries: List<DiscoveryHint> = emptyList(),
+    val id: String, val name: String, val city: String, val area: String, val stars: Int, val rating: Double, val ratingCount: Int,
+    val distanceLabel: String, val reviewSources: List<ReviewSource>, val offers: List<DealOffer>, val insight: String,
+    val flexibilitySaving: Int = 0, val flexibleDateLabel: String? = null, val discoveries: List<DiscoveryHint> = emptyList(),
     val flexibilitySavingExact: Double? = null
 ) {
     val bestOffer: DealOffer get() = offers.minBy { it.finalAmount }
@@ -75,14 +46,21 @@ data class SearchRequest(
     val flexibilityDays: Int = 1
 )
 
-data class LiveSearchEnvelope(val hotels: List<HotelDeal>, val mode: LiveSearchMode, val warnings: List<String> = emptyList(), val generatedAt: String = "")
+data class PriceWatch(
+    val id: String,
+    val hotelId: String,
+    val hotelName: String,
+    val city: String,
+    val checkIn: String,
+    val checkOut: String,
+    val guests: Int,
+    val rooms: Int,
+    val lastSeenPrice: Double,
+    val currency: String,
+    val savedAt: Long
+) {
+    fun toSearchRequest() = SearchRequest(city = city, hotelQuery = hotelName, checkIn = checkIn, checkOut = checkOut, guests = guests, rooms = rooms, flexibilityDays = 1)
+}
 
-data class OfferVerification(
-    val available: Boolean,
-    val expectedPrice: Double,
-    val currentPrice: Double? = null,
-    val changed: Boolean = false,
-    val verifiedAt: String = "",
-    val bookingUrl: String? = null,
-    val reason: String? = null
-)
+data class LiveSearchEnvelope(val hotels: List<HotelDeal>, val mode: LiveSearchMode, val warnings: List<String> = emptyList(), val generatedAt: String = "")
+data class OfferVerification(val available: Boolean, val expectedPrice: Double, val currentPrice: Double? = null, val changed: Boolean = false, val verifiedAt: String = "", val bookingUrl: String? = null, val reason: String? = null)
