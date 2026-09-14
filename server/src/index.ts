@@ -5,10 +5,11 @@ import { verificationResponse } from "./verify.js";
 import { BookingDemandProvider } from "./providers/booking.js";
 import { ExpediaRapidProvider } from "./providers/expedia.js";
 import { BraveOfferDiscovery } from "./providers/brave.js";
-import type { SearchRequest, SearchResponse, VerifyRequest } from "./types.js";
+import { TavilyOfferDiscovery } from "./providers/tavily.js";
+import type { DiscoveryLead, SearchRequest, SearchResponse, VerifyRequest } from "./types.js";
 
 const providers = [new BookingDemandProvider(), new ExpediaRapidProvider()];
-const discovery = new BraveOfferDiscovery();
+const discoveryProviders = [new BraveOfferDiscovery(), new TavilyOfferDiscovery()];
 
 function json(res: any, code: number, body: unknown) {
   res.writeHead(code, {"Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*"});
@@ -47,13 +48,35 @@ async function flexibleSearches(request: SearchRequest): Promise<SearchResponse[
   }
   return output;
 }
+async function discoverOffers(request: SearchRequest, hotelNames: string[]): Promise<DiscoveryLead[]> {
+  const seen = new Set<string>();
+  const output: DiscoveryLead[] = [];
+  for (const discovery of discoveryProviders) {
+    if (!discovery.isConfigured()) continue;
+    if (output.length >= 25) break;
+    try {
+      const leads = await discovery.discover(request, hotelNames);
+      for (const lead of leads) {
+        const key = lead.url.trim().toLowerCase();
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        output.push(lead);
+        if (output.length >= 100) break;
+      }
+    } catch { /* Discovery is supplemental; supplier prices must remain usable. */ }
+  }
+  return output;
+}
 
 const server = createServer(async (req, res) => {
   try {
     if (req.method === "OPTIONS") return json(res, 204, {});
     if (req.method === "GET" && req.url === "/health") return json(res, 200, {
-      ok: true, service: "iqtans-engine", time: new Date().toISOString(), providers: providers.map(p => ({name: p.name, configured: p.isConfigured()})),
-      discovery: {name: discovery.name, configured: discovery.isConfigured()}
+      ok: true,
+      service: "iqtans-engine",
+      time: new Date().toISOString(),
+      providers: providers.map(p => ({name: p.name, configured: p.isConfigured()})),
+      discovery: discoveryProviders.map(p => ({name: p.name, configured: p.isConfigured()}))
     });
     if (req.method === "POST" && req.url === "/v1/search") {
       const request = await body(req) as SearchRequest;
@@ -61,7 +84,7 @@ const server = createServer(async (req, res) => {
       request.bookerCountry ||= "sa"; request.currency ||= "SAR";
       const exactSettled = await Promise.all(providers.map(p => p.search(request)));
       const names = [...new Set(exactSettled.flatMap(r => r.offers.map(o => o.hotelName)))];
-      const [leads, alternatives] = await Promise.all([discovery.discover(request, names), flexibleSearches(request)]);
+      const [leads, alternatives] = await Promise.all([discoverOffers(request, names), flexibleSearches(request)]);
       const exact = buildSearchResponse(request, exactSettled, leads);
       return json(res, 200, attachBestFlexibleDate(exact, alternatives));
     }
