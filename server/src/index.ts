@@ -7,10 +7,12 @@ import { ExpediaRapidProvider } from "./providers/expedia.js";
 import { AmadeusHotelProvider } from "./providers/amadeus.js";
 import { BraveOfferDiscovery } from "./providers/brave.js";
 import { TavilyOfferDiscovery } from "./providers/tavily.js";
-import type { DiscoveryLead, SearchRequest, SearchResponse, VerifyRequest } from "./types.js";
+import { GooglePlacesReviewProvider } from "./providers/googlePlacesReviews.js";
+import type { DiscoveryLead, ExternalReviewRecord, SearchRequest, SearchResponse, VerifyRequest } from "./types.js";
 
 const providers = [new BookingDemandProvider(), new ExpediaRapidProvider(), new AmadeusHotelProvider()];
 const discoveryProviders = [new BraveOfferDiscovery(), new TavilyOfferDiscovery()];
+const reviewProviders = [new GooglePlacesReviewProvider()];
 
 function json(res: any, code: number, body: unknown) {
   res.writeHead(code, {"Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*"});
@@ -69,6 +71,16 @@ async function discoverOffers(request: SearchRequest, hotelNames: string[]): Pro
   }
   return output;
 }
+async function fetchExternalReviews(hotelNames: string[], city: string): Promise<{reviews: ExternalReviewRecord[]; configured: number}> {
+  const configuredProviders = reviewProviders.filter(provider => provider.isConfigured());
+  if (!configuredProviders.length || !hotelNames.length) return {reviews: [], configured: configuredProviders.length};
+  const settled = await Promise.allSettled(configuredProviders.map(provider => provider.fetch(hotelNames, city)));
+  const reviews: ExternalReviewRecord[] = [];
+  for (const result of settled) {
+    if (result.status === "fulfilled") reviews.push(...result.value.reviews);
+  }
+  return {reviews, configured: configuredProviders.length};
+}
 
 const server = createServer(async (req, res) => {
   try {
@@ -78,7 +90,8 @@ const server = createServer(async (req, res) => {
       service: "iqtans-engine",
       time: new Date().toISOString(),
       providers: providers.map(p => ({name: p.name, configured: p.isConfigured()})),
-      discovery: discoveryProviders.map(p => ({name: p.name, configured: p.isConfigured()}))
+      discovery: discoveryProviders.map(p => ({name: p.name, configured: p.isConfigured()})),
+      reviews: reviewProviders.map(p => ({name: p.name, configured: p.isConfigured()}))
     });
     if (req.method === "POST" && req.url === "/v1/search") {
       const request = await body(req) as SearchRequest;
@@ -86,8 +99,12 @@ const server = createServer(async (req, res) => {
       request.bookerCountry ||= "sa"; request.currency ||= "SAR";
       const exactSettled = await Promise.all(providers.map(p => p.search(request)));
       const names = [...new Set(exactSettled.flatMap(r => r.offers.map(o => o.hotelName)))];
-      const [leads, alternatives] = await Promise.all([discoverOffers(request, names), flexibleSearches(request)]);
-      const exact = buildSearchResponse(request, exactSettled, leads);
+      const [leads, alternatives, external] = await Promise.all([
+        discoverOffers(request, names),
+        flexibleSearches(request),
+        fetchExternalReviews(names, request.city)
+      ]);
+      const exact = buildSearchResponse(request, exactSettled, leads, external.reviews, external.configured);
       return json(res, 200, attachBestFlexibleDate(exact, alternatives));
     }
     if (req.method === "POST" && req.url === "/v1/verify") {
