@@ -4,11 +4,12 @@ import { attachBestFlexibleDate, shiftedRequest } from "./flexibility.js";
 import { verificationResponse } from "./verify.js";
 import { BookingDemandProvider } from "./providers/booking.js";
 import { ExpediaRapidProvider } from "./providers/expedia.js";
+import { AmadeusHotelProvider } from "./providers/amadeus.js";
 import { BraveOfferDiscovery } from "./providers/brave.js";
 import { TavilyOfferDiscovery } from "./providers/tavily.js";
 import type { DiscoveryLead, SearchRequest, SearchResponse, VerifyRequest } from "./types.js";
 
-const providers = [new BookingDemandProvider(), new ExpediaRapidProvider()];
+const providers = [new BookingDemandProvider(), new ExpediaRapidProvider(), new AmadeusHotelProvider()];
 const discoveryProviders = [new BraveOfferDiscovery(), new TavilyOfferDiscovery()];
 
 function json(res: any, code: number, body: unknown) {
@@ -32,6 +33,7 @@ async function supplierSearch(request: SearchRequest, onlyProvider?: string): Pr
     const n = p.name.toLowerCase();
     if (wanted.includes("booking")) return n.includes("booking");
     if (wanted.includes("expedia")) return n.includes("expedia");
+    if (wanted.includes("amadeus")) return n.includes("amadeus");
     return n.includes(wanted) || wanted.includes(n);
   });
   const settled = await Promise.all(selected.map(p => p.search(request)));
@@ -63,7 +65,7 @@ async function discoverOffers(request: SearchRequest, hotelNames: string[]): Pro
         output.push(lead);
         if (output.length >= 100) break;
       }
-    } catch { /* Discovery is supplemental; supplier prices must remain usable. */ }
+    } catch { }
   }
   return output;
 }
