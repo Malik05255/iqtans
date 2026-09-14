@@ -21,6 +21,7 @@ import com.iqtans.app.ui.components.DemoModeBanner
 import com.iqtans.app.ui.components.HotelDealCard
 import com.iqtans.app.ui.theme.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ResultsScreen(
     request: SearchRequest,
