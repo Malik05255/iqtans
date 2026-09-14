@@ -1,14 +1,10 @@
 import { applyVerifiedPromotions, loadPromotionRules } from "./promotions.js";
+import { hotelIdentityKey, hotelNameTokens, normalizeHotelText } from "./hotelIdentity.js";
 import type { DiscoveryLead, NormalizedOffer, ProviderResult, RankedHotel, SearchRequest, SearchResponse } from "./types.js";
 
-function hotelKey(name: string): string {
-  return name.toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-}
-
 function relatedLead(lead: DiscoveryLead, hotelName: string): boolean {
-  const h = hotelKey(hotelName);
-  const text = hotelKey(`${lead.title} ${lead.description ?? ""}`);
-  const tokens = h.split(" ").filter(t => t.length > 2);
+  const tokens = hotelNameTokens(hotelName).filter(t => t.length > 2);
+  const text = normalizeHotelText(`${lead.title} ${lead.description ?? ""}`);
   return tokens.length > 0 && tokens.filter(t => text.includes(t)).length >= Math.min(2, tokens.length);
 }
 
@@ -17,7 +13,7 @@ export function buildSearchResponse(request: SearchRequest, providerResults: Pro
   const offers = providerResults.flatMap(r => r.offers).flatMap(o => [o, ...applyVerifiedPromotions(o, rules, request.cards)]);
   const groups = new Map<string, NormalizedOffer[]>();
   for (const offer of offers) {
-    const key = hotelKey(offer.hotelName);
+    const key = hotelIdentityKey(offer.hotelName) || normalizeHotelText(offer.hotelName);
     const list = groups.get(key) ?? [];
     list.push(offer);
     groups.set(key, list);
