@@ -1,6 +1,7 @@
 package com.iqtans.app.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -12,16 +13,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalLayoutDirection
 import com.iqtans.app.data.DealRepository
-import com.iqtans.app.domain.DealOffer
-import com.iqtans.app.domain.HotelDeal
 import com.iqtans.app.domain.SearchRequest
 import com.iqtans.app.ui.screens.*
-import com.iqtans.app.ui.theme.Canvas
 import com.iqtans.app.ui.theme.Emerald
 import com.iqtans.app.ui.theme.Muted
 
@@ -39,7 +37,7 @@ private enum class AppScreen {
 fun IqtansApp(repository: DealRepository) {
     val cities = remember { repository.cities() }
     var screenName by rememberSaveable { mutableStateOf(AppScreen.CITY.name) }
-    val screen get() = AppScreen.valueOf(screenName)
+    val screen = AppScreen.valueOf(screenName)
 
     var request by remember {
         mutableStateOf(
