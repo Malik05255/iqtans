@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.iqtans.app.domain.DealOffer
 import com.iqtans.app.domain.HotelDeal
 import com.iqtans.app.domain.PriceTrust
 import com.iqtans.app.domain.formatMoney
@@ -74,8 +75,8 @@ fun HotelArtwork(name: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun HotelDealCard(hotel: HotelDeal, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val best = hotel.bestOffer
+fun HotelDealCard(hotel: HotelDeal, onClick: () -> Unit, modifier: Modifier = Modifier, bestOfferOverride: DealOffer? = null) {
+    val best = bestOfferOverride ?: hotel.bestOffer
     Card(onClick = onClick, modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
         Column(Modifier.padding(14.dp)) {
             HotelArtwork(hotel.name, Modifier.fillMaxWidth().height(142.dp)); Spacer(Modifier.height(14.dp))
@@ -85,7 +86,11 @@ fun HotelDealCard(hotel: HotelDeal, onClick: () -> Unit, modifier: Modifier = Mo
             }
             Spacer(Modifier.height(12.dp)); HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .6f)); Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.Bottom) {
-                Column(Modifier.weight(1f)) { Text("أفضل اقتناص", style = MaterialTheme.typography.labelMedium, color = Emerald, fontWeight = FontWeight.Bold); Row(verticalAlignment = Alignment.Bottom) { Text(formatMoney(best.finalAmount), fontSize = 28.sp, fontWeight = FontWeight.Black, color = Ink); Text(" ${best.currency}", style = MaterialTheme.typography.bodyMedium, color = Muted, modifier = Modifier.padding(bottom = 4.dp)) }; Text("الإجمالي النهائي حسب بيانات المزود", style = MaterialTheme.typography.labelMedium, color = Muted) }
+                Column(Modifier.weight(1f)) {
+                    Text(if (bestOfferOverride != null) "أفضل عرض مطابق للفلاتر" else "أفضل اقتناص", style = MaterialTheme.typography.labelMedium, color = Emerald, fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.Bottom) { Text(formatMoney(best.finalAmount), fontSize = 28.sp, fontWeight = FontWeight.Black, color = Ink); Text(" ${best.currency}", style = MaterialTheme.typography.bodyMedium, color = Muted, modifier = Modifier.padding(bottom = 4.dp)) }
+                    Text("${best.cancellation} • ${best.meal} • ${best.paymentLabel}", style = MaterialTheme.typography.labelMedium, color = Muted, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
                 Column(horizontalAlignment = Alignment.End) { if (best.savingsAmount > 0.0) Surface(color = SoftSand, shape = RoundedCornerShape(12.dp)) { Text("وفّر ${formatMoney(best.savingsAmount)} ${best.currency}", modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp), color = Night, fontWeight = FontWeight.Black) }; Spacer(Modifier.height(6.dp)); TrustChip(best.trust) }
             }
         }
