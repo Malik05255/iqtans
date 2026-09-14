@@ -38,7 +38,10 @@ fun HotelDetailScreen(hotel: HotelDeal, watched: Boolean, onBack: () -> Unit, on
                     Row(verticalAlignment = Alignment.CenterVertically) { Surface(color = Sand, shape = RoundedCornerShape(999.dp)) { Text("أفضل اقتناص", modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp), color = Night, fontWeight = FontWeight.Black) }; Spacer(Modifier.weight(1f)); TrustChip(best.trust) }
                     Spacer(Modifier.height(16.dp)); Text("${formatMoney(best.finalAmount)} ${best.currency}", color = androidx.compose.ui.graphics.Color.White, fontSize = 36.sp, fontWeight = FontWeight.Black)
                     if (best.savingsAmount > 0.0) Text("بدل ${formatMoney(best.referenceAmount)} ${best.currency} • وفّر ${formatMoney(best.savingsAmount)} ${best.currency} (${best.savingsPercent}%)", color = androidx.compose.ui.graphics.Color.White.copy(alpha = .76f))
-                    Spacer(Modifier.height(13.dp)); Text(best.method, color = Sand, fontWeight = FontWeight.Bold); Spacer(Modifier.height(12.dp)); Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Rounded.Verified, null, tint = Mint, modifier = Modifier.size(18.dp)); Text("  تطابق ${best.matchPercent}% • ${best.cancellation} • ${best.meal}", color = androidx.compose.ui.graphics.Color.White.copy(alpha = .86f), style = MaterialTheme.typography.bodyMedium) }; Spacer(Modifier.height(14.dp)); Text("اضغط لمعرفة كيف تحصل على السعر ←", color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(13.dp)); Text(best.method, color = Sand, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(10.dp)); best.roomName?.let { Text(it, color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold) }
+                    Spacer(Modifier.height(8.dp)); Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Rounded.Verified, null, tint = Mint, modifier = Modifier.size(18.dp)); Text("  تطابق ${best.matchPercent}% • ${best.cancellation} • ${best.meal} • ${best.paymentLabel}", color = androidx.compose.ui.graphics.Color.White.copy(alpha = .86f), style = MaterialTheme.typography.bodyMedium) }
+                    Spacer(Modifier.height(14.dp)); Text("اضغط لمعرفة كيف تحصل على السعر ←", color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -59,6 +62,9 @@ private fun OfferRow(offer: DealOffer, onClick: () -> Unit) {
     Card(onClick = onClick, shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(15.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(offer.source, fontWeight = FontWeight.Black); Text(offer.method, color = Muted, style = MaterialTheme.typography.bodyMedium) }; Column(horizontalAlignment = Alignment.End) { Text("${formatMoney(offer.finalAmount)} ${offer.currency}", fontWeight = FontWeight.Black, fontSize = 20.sp); if (offer.savingsAmount > 0.0) Text("وفّر ${formatMoney(offer.savingsAmount)}", color = Emerald, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold) } }
+            Spacer(Modifier.height(8.dp))
+            Text(offer.roomName ?: "نوع الغرفة يحتاج تأكيد", color = Ink, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+            Text("${offer.cancellation} • ${offer.meal} • ${offer.paymentLabel}", color = Muted, style = MaterialTheme.typography.bodySmall)
             Spacer(Modifier.height(10.dp)); Row(verticalAlignment = Alignment.CenterVertically) { TrustChip(offer.trust); Spacer(Modifier.width(7.dp)); Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(999.dp)) { Text("تطابق ${offer.matchPercent}%", modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp), style = MaterialTheme.typography.labelMedium, color = Muted) } }
         }
     }
