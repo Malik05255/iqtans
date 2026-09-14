@@ -126,7 +126,7 @@ fun ResultsScreen(
 
         if (!isLive) item { DemoModeBanner() }
 
-        if (coverage.priceProvidersTotal > 0) {
+        if (coverage.priceProvidersTotal > 0 || coverage.reviewProvidersConfigured > 0) {
             item { CoverageCard(coverage = coverage, isLive = isLive) }
         }
 
@@ -223,9 +223,23 @@ private fun CoverageCard(coverage: SearchCoverage, isLive: Boolean) {
                 style = MaterialTheme.typography.bodyMedium
             )
             if (coverage.configuredProviderNames.isNotEmpty()) {
-                Text("تم الفحص: ${coverage.configuredProviderNames.joinToString(" • ")}", color = Emerald, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                Text("تم فحص الأسعار عبر: ${coverage.configuredProviderNames.joinToString(" • ")}", color = Emerald, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
             }
             Text("عروض أسعار حية تم استلامها: ${coverage.liveOffers}", color = Muted, style = MaterialTheme.typography.bodyMedium)
+            if (coverage.reviewProvidersConfigured > 0) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .35f))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.RateReview, null, tint = Emerald, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(7.dp))
+                    Text("مصادر تقييم مستقلة مفعلة: ${coverage.reviewProvidersConfigured}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                }
+                Text(
+                    if (coverage.externalReviewSources > 0) "أعادت بيانات تقييم من ${coverage.externalReviewSources} مصدر خارجي. كل تقييم يظهر بمصدره وattribution الخاص به."
+                    else "لم يعد مصدر التقييم الخارجي بيانات لهذا البحث؛ تقييمات مزودي الحجز تبقى منفصلة وواضحة.",
+                    color = Muted,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
             if (coverage.discoveredLeads > 0) {
                 Text("إشارات عروض من الويب: ${coverage.discoveredLeads} — لا تدخل في التوفير حتى التحقق.", color = Night, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
             }
