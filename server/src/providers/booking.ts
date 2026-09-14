@@ -1,5 +1,5 @@
 import { money } from "../money.js";
-import type { NormalizedOffer, ProviderResult, SearchProvider, SearchRequest } from "../types.js";
+import type { NormalizedOffer, PriceBreakdown, ProviderResult, SearchProvider, SearchRequest } from "../types.js";
 
 export class BookingDemandProvider implements SearchProvider {
   readonly name = "Booking.com Demand";
@@ -54,6 +54,27 @@ export class BookingDemandProvider implements SearchProvider {
     return money(data?.price?.total?.booker_currency) || money(data?.price?.total) || money(data?.price?.display?.booker_currency) || money(data?.price?.display) || money(data?.price);
   }
 
+  private breakdown(data: any, total: number, currency: string): PriceBreakdown {
+    const price = data?.price ?? {};
+    const base = money(price?.base?.booker_currency) || money(price?.base);
+    const online = money(price?.chargeable_online?.booker_currency) || money(price?.chargeable_online);
+    const room = base > 0 && base <= total ? base : total;
+    const mandatoryFees = Math.max(0, total - room);
+    const payAtProperty = online > 0 && online <= total ? Math.max(0, total - online) : 0;
+    return {room, taxes: 0, mandatoryFees, payAtProperty, currency};
+  }
+
+  private conditionalChargeWarning(data: any): boolean {
+    const price = data?.price ?? {};
+    const candidates = [
+      price?.charges?.conditional,
+      price?.extra_charges?.conditional,
+      price?.extra_charges?.excluded,
+      price?.charges?.excluded
+    ];
+    return candidates.some(v => Array.isArray(v) && v.length > 0);
+  }
+
   async search(request: SearchRequest): Promise<ProviderResult> {
     const started = Date.now();
     if (!this.isConfigured()) return {provider: this.name, configured: false, offers: [], warning: "BOOKING_API_TOKEN / BOOKING_AFFILIATE_ID غير مضبوطة", latencyMs: Date.now() - started};
@@ -70,7 +91,7 @@ export class BookingDemandProvider implements SearchProvider {
       });
       const rows: any[] = Array.isArray(payload.data) ? payload.data : [];
       const ids = rows.slice(0, 100).map(r => r.id).filter(Boolean);
-      let detailsById = new Map<string, any>();
+      const detailsById = new Map<string, any>();
       if (ids.length) {
         try {
           const details = await this.post("/accommodations/details", {accommodations: ids, extras: ["photos", "rooms"]});
@@ -85,8 +106,12 @@ export class BookingDemandProvider implements SearchProvider {
         const d = detailsById.get(String(r.id)) ?? {};
         const hotelName = this.names(d.name)[0] || this.names(r.name)[0] || `Booking #${r.id}`;
         if (request.hotelName && !hotelName.toLowerCase().includes(request.hotelName.toLowerCase())) return [];
-        const currency = r?.currency?.booker || r?.currency || request.currency || "SAR";
+        const currency = request.currency || "SAR";
         const url = r?.url?.web || r?.url || d?.url?.web;
+        const product = Array.isArray(r?.products) ? r.products[0] : undefined;
+        const requirements: string[] = [];
+        if (!product) requirements.push("تفاصيل الغرفة والسياسة تحتاج إعادة تحقق قبل الانتقال للدفع");
+        if (this.conditionalChargeWarning(r)) requirements.push("يوجد رسم مشروط أو مستبعد لدى المزود؛ راجع شرطه لأنه قد لا ينطبق على كل نزيل");
         return [{
           id: `booking:${r.id}:${index}`,
           provider: "Booking.com",
@@ -96,23 +121,23 @@ export class BookingDemandProvider implements SearchProvider {
           stars: Number(d?.rating?.stars || d?.stars || 0) || undefined,
           rating: Number(d?.rating?.review_score || d?.review_score || 0) || undefined,
           ratingCount: Number(d?.rating?.number_of_reviews || d?.number_of_reviews || 0) || undefined,
-          roomName: r?.products?.[0]?.room_name || undefined,
-          meal: r?.products?.[0]?.meal_plan || "حسب المنتج",
-          cancellation: r?.products?.[0]?.policies?.cancellation?.type || "راجع الشروط",
+          roomName: product?.room_name || undefined,
+          meal: product?.meal_plan || "حسب المنتج",
+          cancellation: product?.policies?.cancellation?.type || "راجع الشروط",
           checkIn: request.checkIn,
           checkOut: request.checkOut,
           adults: request.adults,
           rooms: request.rooms,
           totalPrice: total,
-          breakdown: {room: total, taxes: 0, mandatoryFees: 0, payAtProperty: 0, currency: String(currency)},
+          breakdown: this.breakdown(r, total, currency),
           strategyKind: "STANDARD",
           method: "السعر الحي من Booking.com",
           bookingUrl: typeof url === "string" ? url : undefined,
           evidenceUrl: "https://developers.booking.com/demand/docs/accommodations/about-accommodation",
           verification: "LIVE_VERIFIED",
           verifiedAt: now,
-          matchPercent: 100,
-          requirements: []
+          matchPercent: product ? 100 : 92,
+          requirements
         } satisfies NormalizedOffer];
       });
       return {provider: this.name, configured: true, offers, latencyMs: Date.now() - started};

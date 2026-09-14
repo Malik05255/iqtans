@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { money } from "../money.js";
-import type { NormalizedOffer, ProviderResult, SearchProvider, SearchRequest } from "../types.js";
+import type { NormalizedOffer, PriceBreakdown, ProviderResult, SearchProvider, SearchRequest } from "../types.js";
 
 export class ExpediaRapidProvider implements SearchProvider {
   readonly name = "Expedia Rapid";
@@ -34,6 +34,16 @@ export class ExpediaRapidProvider implements SearchProvider {
     return Array.isArray(ids) ? ids.map(String).slice(0, 250) : [];
   }
 
+  private amount(value: any): number {
+    return money(value?.request_currency) || money(value?.billable_currency) || money(value);
+  }
+
+  private breakdown(totals: any, total: number, currency: string): PriceBreakdown {
+    const exclusive = this.amount(totals?.exclusive);
+    const room = exclusive > 0 && exclusive <= total ? exclusive : total;
+    return {room, taxes: 0, mandatoryFees: Math.max(0, total - room), payAtProperty: 0, currency};
+  }
+
   async search(request: SearchRequest): Promise<ProviderResult> {
     const started = Date.now();
     if (!this.isConfigured()) return {provider: this.name, configured: false, offers: [], warning: "EXPEDIA_API_KEY / EXPEDIA_SHARED_SECRET غير مضبوطة", latencyMs: Date.now() - started};
@@ -54,17 +64,22 @@ export class ExpediaRapidProvider implements SearchProvider {
         const rooms: any[] = p.rooms || [];
         for (const room of rooms) {
           for (const rate of (room.rates || [])) {
-            const total = money(rate?.occupancy_pricing?.[occupancy]?.totals?.inclusive?.request_currency) || money(rate?.occupancy_pricing?.[occupancy]?.totals?.inclusive) || money(rate?.totals?.inclusive) || money(rate?.price);
+            const pricing = rate?.occupancy_pricing?.[occupancy];
+            const totals = pricing?.totals || rate?.totals || {};
+            const total = this.amount(totals?.inclusive) || money(rate?.price);
             if (!(total > 0)) continue;
+            const hasRoom = Boolean(room.room_name || room.name);
+            const hasCancellation = typeof rate?.refundable === "boolean" || Boolean(rate?.cancel_penalties);
             offers.push({
               id: `expedia:${p.property_id || p.id}:${rate.id || offers.length}`,
               provider: "Expedia Rapid", providerHotelId: String(p.property_id || p.id), hotelName: String(hotelName), city: request.city,
               roomName: room.room_name || room.name, meal: rate?.amenities?.meal_plan || "حسب السعر", cancellation: rate?.refundable ? "قابل للإلغاء حسب الشروط" : "غير مسترد/راجع الشروط",
               checkIn: request.checkIn, checkOut: request.checkOut, adults: request.adults, rooms: request.rooms, totalPrice: total,
-              breakdown: {room: total, taxes: 0, mandatoryFees: 0, payAtProperty: 0, currency: request.currency || "SAR"},
+              breakdown: this.breakdown(totals, total, request.currency || "SAR"),
               strategyKind: "STANDARD", method: "السعر الحي من Expedia Rapid", bookingUrl: rate?.bed_groups?.links?.book?.href || rate?.links?.book?.href,
               evidenceUrl: "https://developers.expediagroup.com/rapid/lodging/shopping/about-shopping-api", verification: "LIVE_VERIFIED", verifiedAt: now,
-              matchPercent: 100, requirements: []
+              matchPercent: hasRoom && hasCancellation ? 100 : 94,
+              requirements: hasRoom ? [] : ["اسم الغرفة يحتاج إعادة تحقق قبل الدفع"]
             });
           }
         }
