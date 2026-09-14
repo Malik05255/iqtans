@@ -93,8 +93,10 @@ class BackendSearchClient(private val baseUrl: String) {
         )
     }
 
-    private fun parseOffer(raw: JSONObject, baselineExact: Double): DealOffer {
-        val totalExact = raw.optDouble("totalPrice", 0.0); val requirements = raw.optJSONArray("requirements").strings(); val breakdownObject = raw.optJSONObject("breakdown") ?: JSONObject()
+    private fun parseOffer(raw: JSONObject, hotelBaselineExact: Double): DealOffer {
+        val totalExact = raw.optDouble("totalPrice", 0.0)
+        val comparisonExact = raw.optDouble("comparisonPrice", hotelBaselineExact)
+        val requirements = raw.optJSONArray("requirements").strings(); val breakdownObject = raw.optJSONObject("breakdown") ?: JSONObject()
         val breakdown = buildList {
             val room = breakdownObject.optDouble("room", 0.0).roundToInt(); val taxes = breakdownObject.optDouble("taxes", 0.0).roundToInt(); val fees = breakdownObject.optDouble("mandatoryFees", 0.0).roundToInt(); val property = breakdownObject.optDouble("payAtProperty", 0.0).roundToInt()
             if (room > 0) add("سعر الإقامة الأساسي" to room); if (taxes > 0) add("ضرائب" to taxes); if (fees > 0) add("ضرائب/رسوم إلزامية ضمن الإجمالي" to fees); if (property > 0) add("من الإجمالي يُدفع في الفندق" to property)
@@ -103,12 +105,12 @@ class BackendSearchClient(private val baseUrl: String) {
         val verification = raw.optString("verification"); val source = raw.optString("provider", "مصدر الحجز")
         val steps = buildList { add("افتح مصدر الحجز: $source."); addAll(requirements); add("تأكد أن نفس الفندق والتواريخ والغرفة والسياسات ما زالت مطابقة قبل الدفع."); add("تحقق من أن الإجمالي النهائي الظاهر لا يتجاوز ${formatMoney(totalExact)} ${breakdownObject.optString("currency", "SAR")}.") }
         return DealOffer(
-            id = raw.optString("id"), source = source, finalPrice = totalExact.roundToInt(), referencePrice = baselineExact.roundToInt(), currency = breakdownObject.optString("currency", "SAR"),
+            id = raw.optString("id"), source = source, finalPrice = totalExact.roundToInt(), referencePrice = comparisonExact.roundToInt(), currency = breakdownObject.optString("currency", "SAR"),
             title = title, method = raw.optString("method", source), trust = if (verification == "LIVE_VERIFIED") PriceTrust.VERIFIED_LIVE else PriceTrust.DISCOVERED,
             matchPercent = raw.optInt("matchPercent", 100), lastChecked = raw.optString("verifiedAt", "تحقق حديث"), cancellation = raw.optString("cancellation", "راجع سياسة الإلغاء"), meal = raw.optString("meal", "حسب العرض"),
             conditions = requirements, steps = steps, breakdown = breakdown, cardRequirement = requirements.firstOrNull { it.contains("بطاقة") }, memberRequirement = requirements.firstOrNull { it.contains("عضوية") || it.contains("حساب") },
             bookingUrl = raw.optString("bookingUrl").takeIf { it.isNotBlank() }, evidenceUrl = raw.optString("evidenceUrl").takeIf { it.isNotBlank() }, providerHotelId = raw.optString("providerHotelId"), roomName = raw.optString("roomName").takeIf { it.isNotBlank() },
-            finalPriceExact = totalExact, referencePriceExact = baselineExact
+            finalPriceExact = totalExact, referencePriceExact = comparisonExact
         )
     }
 }
