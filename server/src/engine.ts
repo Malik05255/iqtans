@@ -1,6 +1,6 @@
 import { applyVerifiedPromotions, loadPromotionRules } from "./promotions.js";
 import { hotelIdentityKey, hotelNameTokens, normalizeHotelText } from "./hotelIdentity.js";
-import type { DiscoveryLead, NormalizedOffer, ProviderResult, RankedHotel, SearchRequest, SearchResponse } from "./types.js";
+import type { DiscoveryLead, NormalizedOffer, ProviderResult, RankedHotel, ReviewSummary, SearchRequest, SearchResponse } from "./types.js";
 
 function relatedLead(lead: DiscoveryLead, hotelName: string): boolean {
   const tokens = hotelNameTokens(hotelName).filter(t => t.length > 2);
@@ -16,6 +16,27 @@ function productKey(offer: NormalizedOffer): string {
     normalizeHotelText(offer.meal || ""), normalizeHotelText(offer.cancellation || ""),
     offer.checkIn, offer.checkOut, offer.adults, offer.rooms
   ].join("|");
+}
+
+function inferRatingScale(score: number): number {
+  return score > 5 ? 10 : 5;
+}
+
+export function collectReviewSummaries(input: NormalizedOffer[]): ReviewSummary[] {
+  const bySource = new Map<string, ReviewSummary>();
+  for (const offer of input) {
+    const score = Number(offer.rating || 0);
+    if (!(score > 0)) continue;
+    const candidate: ReviewSummary = {
+      source: offer.provider,
+      score,
+      scale: inferRatingScale(score),
+      count: Math.max(0, Math.trunc(Number(offer.ratingCount || 0)))
+    };
+    const previous = bySource.get(candidate.source);
+    if (!previous || candidate.count > previous.count) bySource.set(candidate.source, candidate);
+  }
+  return [...bySource.values()].sort((a, b) => b.count - a.count || b.score / b.scale - a.score / a.scale);
 }
 
 export function withFairComparisonPrices(input: NormalizedOffer[]): NormalizedOffer[] {
@@ -67,6 +88,7 @@ export function buildSearchResponse(request: SearchRequest, providerResults: Pro
       savings,
       savingsPercent: baseline > 0 ? Math.round(savings * 100 / baseline) : 0,
       offers: sorted,
+      reviews: collectReviewSummaries(sorted),
       discoveries: discoveries.filter(d => relatedLead(d, winner.hotelName)).slice(0, 12)
     };
   }).sort((a, b) => a.bestPrice - b.bestPrice);

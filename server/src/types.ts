@@ -29,9 +29,10 @@ export interface ProviderResult { provider: string; configured: boolean; offers:
 export interface SearchProvider { readonly name: string; isConfigured(): boolean; search(request: SearchRequest): Promise<ProviderResult>; }
 export interface DiscoveryProvider { readonly name: string; isConfigured(): boolean; discover(request: SearchRequest, hotelNames: string[]): Promise<DiscoveryLead[]>; }
 export interface FlexibleDateOption { checkIn: string; checkOut: string; bestPrice: number; savings: number; dayShift: number; }
+export interface ReviewSummary { source: string; score: number; scale: number; count: number; }
 export interface RankedHotel {
   key: string; name: string; city: string; baselinePrice: number; bestPrice: number; savings: number; savingsPercent: number;
-  offers: NormalizedOffer[]; discoveries: DiscoveryLead[]; flexible?: FlexibleDateOption;
+  offers: NormalizedOffer[]; discoveries: DiscoveryLead[]; reviews?: ReviewSummary[]; flexible?: FlexibleDateOption;
 }
 export interface SearchCoverage {
   priceProvidersTotal: number;

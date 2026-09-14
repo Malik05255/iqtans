@@ -103,14 +103,27 @@ class BackendSearchClient(private val baseUrl: String) {
             val url = d.optString("url")
             if (url.isNotBlank()) discoveries += DiscoveryHint(d.optString("title", "عرض مكتشف"), url, d.optString("source", "الويب"), d.optString("description").takeIf { it.isNotBlank() })
         }
+        val reviewSources = mutableListOf<ReviewSource>()
+        hotel.optJSONArray("reviews")?.forEachObject { review ->
+            val source = review.optString("source")
+            val score = review.optDouble("score", 0.0)
+            val scale = review.optInt("scale", 10).coerceAtLeast(1)
+            val count = review.optInt("count", 0).coerceAtLeast(0)
+            if (source.isNotBlank() && score > 0.0) reviewSources += ReviewSource(source, score, scale, count)
+        }
         val flexible = hotel.optJSONObject("flexible")
         val flexibilitySavingExact = flexible?.optNullableDouble("savings") ?: 0.0
         val flexibleDateLabel = flexible?.let { val a = it.optString("checkIn"); val b = it.optString("checkOut"); if (a.isNotBlank() && b.isNotBlank()) "$a — $b" else null }
-        val rating = first.optDouble("rating", 0.0); val ratingCount = first.optInt("ratingCount", 0); val provider = first.optString("provider", "مصدر حي")
+        val fallbackRating = first.optDouble("rating", 0.0)
+        val fallbackCount = first.optInt("ratingCount", 0)
+        val provider = first.optString("provider", "مصدر حي")
+        val finalReviewSources = if (reviewSources.isNotEmpty()) reviewSources else if (fallbackRating > 0.0) listOf(ReviewSource(provider, fallbackRating, if (fallbackRating > 5) 10 else 5, fallbackCount)) else emptyList()
+        val primaryReview = finalReviewSources.maxByOrNull { it.count }
+        val normalizedRating = primaryReview?.let { it.score * 10.0 / it.scale } ?: 0.0
         return HotelDeal(
             id = hotel.optString("key", hotel.optString("name")), name = hotel.optString("name", "فندق"), city = hotel.optString("city"), area = "نتيجة اقتنص الحية",
-            stars = first.optInt("stars", 0).coerceIn(0, 5), rating = rating, ratingCount = ratingCount, distanceLabel = provider,
-            reviewSources = if (rating > 0) listOf(ReviewSource(provider, rating, 10, ratingCount)) else emptyList(), offers = offers,
+            stars = first.optInt("stars", 0).coerceIn(0, 5), rating = normalizedRating, ratingCount = primaryReview?.count ?: 0, distanceLabel = provider,
+            reviewSources = finalReviewSources, offers = offers,
             insight = discoveries.firstOrNull()?.title ?: offers.first().method,
             flexibilitySaving = flexibilitySavingExact.roundToInt(), flexibleDateLabel = flexibleDateLabel, discoveries = discoveries, flexibilitySavingExact = flexibilitySavingExact
         )
