@@ -77,7 +77,18 @@ class BackendSearchClient(private val baseUrl: String) {
     private fun parseEnvelope(root: JSONObject): LiveSearchEnvelope {
         val mode = when (root.optString("mode")) { "live" -> LiveSearchMode.LIVE; "partial" -> LiveSearchMode.PARTIAL; else -> LiveSearchMode.UNCONFIGURED }
         val warnings = mutableListOf<String>()
-        root.optJSONArray("providers")?.forEachObject { p -> p.optString("warning").takeIf { it.isNotBlank() }?.let(warnings::add) }
+        val configuredProviderNames = mutableListOf<String>()
+        val providerWarnings = mutableListOf<String>()
+        root.optJSONArray("providers")?.forEachObject { p ->
+            val name = p.optString("name", "مصدر أسعار")
+            val configured = p.optBoolean("configured", false)
+            val warning = p.optString("warning").takeIf { it.isNotBlank() }
+            if (configured) configuredProviderNames += name
+            if (warning != null) {
+                warnings += warning
+                providerWarnings += "$name: $warning"
+            }
+        }
         val hotels = mutableListOf<HotelDeal>()
         root.optJSONArray("hotels")?.forEachObject { hotel -> parseHotel(hotel)?.let(hotels::add) }
         val coverageObject = root.optJSONObject("coverage") ?: JSONObject()
@@ -86,7 +97,9 @@ class BackendSearchClient(private val baseUrl: String) {
             priceProvidersConfigured = coverageObject.optInt("priceProvidersConfigured", 0),
             priceProvidersWithResults = coverageObject.optInt("priceProvidersWithResults", 0),
             liveOffers = coverageObject.optInt("liveOffers", 0),
-            discoveredLeads = coverageObject.optInt("discoveredLeads", 0)
+            discoveredLeads = coverageObject.optInt("discoveredLeads", 0),
+            configuredProviderNames = configuredProviderNames,
+            providerWarnings = providerWarnings
         )
         return LiveSearchEnvelope(hotels, mode, warnings, root.optString("generatedAt"), coverage)
     }

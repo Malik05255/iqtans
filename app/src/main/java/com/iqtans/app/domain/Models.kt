@@ -86,7 +86,9 @@ data class SearchCoverage(
     val priceProvidersConfigured: Int = 0,
     val priceProvidersWithResults: Int = 0,
     val liveOffers: Int = 0,
-    val discoveredLeads: Int = 0
+    val discoveredLeads: Int = 0,
+    val configuredProviderNames: List<String> = emptyList(),
+    val providerWarnings: List<String> = emptyList()
 )
 
 data class LiveSearchEnvelope(

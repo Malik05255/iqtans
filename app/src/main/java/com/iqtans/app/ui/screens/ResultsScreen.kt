@@ -106,9 +106,17 @@ private fun CoverageCard(coverage: SearchCoverage, isLive: Boolean) {
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.bodyMedium
             )
+            if (coverage.configuredProviderNames.isNotEmpty()) {
+                Text("تم الفحص: ${coverage.configuredProviderNames.joinToString(" • ")}", color = Emerald, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+            }
             Text("عروض أسعار حية تم استلامها: ${coverage.liveOffers}", color = Muted, style = MaterialTheme.typography.bodyMedium)
             if (coverage.discoveredLeads > 0) {
                 Text("إشارات عروض من الويب: ${coverage.discoveredLeads} — لا تدخل في التوفير حتى التحقق.", color = Night, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            }
+            if (coverage.providerWarnings.isNotEmpty()) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .35f))
+                Text("مصادر لم تُكمل الفحص:", color = Night, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                coverage.providerWarnings.take(3).forEach { warning -> Text("• $warning", color = Muted, style = MaterialTheme.typography.labelMedium) }
             }
         }
     }
