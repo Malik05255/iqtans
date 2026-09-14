@@ -2,6 +2,7 @@ package com.iqtans.app.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -131,8 +132,7 @@ fun HotelDetailScreen(
         item {
             SectionTitle("كل طرق الحجز", "لا نرتبها بنسبة خصم دعائية؛ نرتبها بالتكلفة النهائية.")
         }
-        items(hotel.offers.size) { index ->
-            val offer = hotel.offers.sortedBy { it.finalPrice }[index]
+        items(hotel.offers.sortedBy { it.finalPrice }, key = { it.id }) { offer ->
             OfferRow(offer = offer, onClick = { onOfferClick(offer) })
         }
 
