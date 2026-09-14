@@ -43,7 +43,7 @@ export interface SearchCoverage {
 export interface SearchResponse {
   request: SearchRequest; generatedAt: string; mode: "live" | "partial" | "unconfigured";
   providers: Array<{name: string; configured: boolean; warning?: string; latencyMs: number}>;
-  coverage: SearchCoverage;
+  coverage?: SearchCoverage;
   hotels: RankedHotel[]; disclaimer: string;
 }
 export interface VerifyRequest {
