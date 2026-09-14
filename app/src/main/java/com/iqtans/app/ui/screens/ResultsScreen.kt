@@ -12,7 +12,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.iqtans.app.domain.DealOffer
 import com.iqtans.app.domain.HotelDeal
+import com.iqtans.app.domain.PriceTrust
 import com.iqtans.app.domain.SearchCoverage
 import com.iqtans.app.domain.SearchRequest
 import com.iqtans.app.ui.components.DemoModeBanner
@@ -29,13 +31,75 @@ fun ResultsScreen(
     onHotelClick: (HotelDeal) -> Unit
 ) {
     var sort by remember { mutableStateOf("التوفير") }
-    val sorted = remember(hotels, sort) {
-        when (sort) {
-            "السعر" -> hotels.sortedBy { it.bestOffer.finalAmount }
-            "التقييم" -> hotels.sortedByDescending { it.rating }
-            else -> hotels.sortedByDescending { it.bestOffer.savingsAmount }
+    var showFilters by remember { mutableStateOf(false) }
+    var verifiedOnly by remember { mutableStateOf(false) }
+    var perfectMatchOnly by remember { mutableStateOf(false) }
+    var cancellableOnly by remember { mutableStateOf(false) }
+    var breakfastOnly by remember { mutableStateOf(false) }
+    var propertyPaymentOnly by remember { mutableStateOf(false) }
+
+    val activeFilterCount = listOf(verifiedOnly, perfectMatchOnly, cancellableOnly, breakfastOnly, propertyPaymentOnly).count { it }
+    val hasActiveFilters = activeFilterCount > 0
+
+    fun offerMatches(offer: DealOffer): Boolean {
+        if (verifiedOnly && offer.trust != PriceTrust.VERIFIED_LIVE) return false
+        if (perfectMatchOnly && offer.matchPercent != 100) return false
+        if (cancellableOnly && !isCancellable(offer)) return false
+        if (breakfastOnly && !hasBreakfast(offer)) return false
+        if (propertyPaymentOnly && !offer.paymentLabel.contains("الفندق")) return false
+        return true
+    }
+
+    val filteredRows = remember(hotels, sort, verifiedOnly, perfectMatchOnly, cancellableOnly, breakfastOnly, propertyPaymentOnly) {
+        hotels.mapNotNull { hotel ->
+            val matchingOffers = hotel.offers.filter(::offerMatches)
+            if (matchingOffers.isEmpty()) null
+            else {
+                val bestMatching = matchingOffers.minBy { it.finalAmount }
+                Triple(hotel, bestMatching, if (hasActiveFilters) hotel.copy(offers = matchingOffers) else hotel)
+            }
+        }.let { rows ->
+            when (sort) {
+                "السعر" -> rows.sortedBy { it.second.finalAmount }
+                "التقييم" -> rows.sortedByDescending { it.first.rating }
+                else -> rows.sortedByDescending { it.second.savingsAmount }
+            }
         }
     }
+
+    if (showFilters) {
+        ModalBottomSheet(onDismissRequest = { showFilters = false }) {
+            Column(
+                Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 30.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text("فلترة شروط الحجز", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
+                Text("السعر الظاهر بعد الفلترة سيكون لأرخص عرض يحقق الشروط المختارة فعلًا.", color = Muted, style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(10.dp))
+                FilterSwitch("مؤكد حيًا فقط", "استبعد الأسعار المكتشفة أو التجريبية.", verifiedOnly) { verifiedOnly = it }
+                FilterSwitch("تطابق 100%", "نفس الغرفة والشروط التي استطاع اقتنص إثباتها بالكامل.", perfectMatchOnly) { perfectMatchOnly = it }
+                FilterSwitch("قابل للإلغاء", "اعرض العروض التي يذكر مصدرها أنها قابلة للإلغاء أو الاسترداد.", cancellableOnly) { cancellableOnly = it }
+                FilterSwitch("إفطار مشمول", "اعرض العروض التي يذكر مصدرها الإفطار ضمن الوجبة.", breakfastOnly) { breakfastOnly = it }
+                FilterSwitch("دفع في الفندق", "يشمل الدفع الكامل أو الجزئي في مكان الإقامة.", propertyPaymentOnly) { propertyPaymentOnly = it }
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(
+                        onClick = {
+                            verifiedOnly = false
+                            perfectMatchOnly = false
+                            cancellableOnly = false
+                            breakfastOnly = false
+                            propertyPaymentOnly = false
+                        },
+                        modifier = Modifier.weight(1f),
+                        enabled = hasActiveFilters
+                    ) { Text("مسح الفلاتر") }
+                    Button(onClick = { showFilters = false }, modifier = Modifier.weight(1f)) { Text("عرض النتائج") }
+                }
+            }
+        }
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 42.dp, bottom = 118.dp),
@@ -49,8 +113,12 @@ fun ResultsScreen(
                     Text("${request.city} • ${request.checkIn} — ${request.checkOut}", color = Muted, style = MaterialTheme.typography.bodyMedium)
                     Text(occupancyLabel(request), color = Muted, style = MaterialTheme.typography.labelMedium)
                 }
-                Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(14.dp)) {
-                    Icon(Icons.Rounded.FilterList, null, tint = Emerald, modifier = Modifier.padding(11.dp).size(21.dp))
+                BadgedBox(badge = {
+                    if (activeFilterCount > 0) Badge { Text(activeFilterCount.toString()) }
+                }) {
+                    FilledTonalIconButton(onClick = { showFilters = true }) {
+                        Icon(Icons.Rounded.FilterList, "فلترة النتائج", tint = Emerald)
+                    }
                 }
             }
         }
@@ -69,23 +137,70 @@ fun ResultsScreen(
             }
         }
 
-        if (sorted.isEmpty()) {
+        if (hasActiveFilters) {
+            item {
+                Surface(color = SoftMint, shape = RoundedCornerShape(16.dp)) {
+                    Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.Tune, null, tint = Emerald)
+                        Spacer(Modifier.width(8.dp))
+                        Text("$activeFilterCount شروط فعالة • السعر في البطاقة مطابق لها", color = Emerald, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { showFilters = true }) { Text("تعديل") }
+                    }
+                }
+            }
+        }
+
+        if (filteredRows.isEmpty()) {
             item {
                 Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(24.dp)) {
                     Column(Modifier.fillMaxWidth().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Rounded.Search, null, tint = Emerald, modifier = Modifier.size(36.dp))
+                        Icon(Icons.Rounded.SearchOff, null, tint = Emerald, modifier = Modifier.size(36.dp))
                         Spacer(Modifier.height(12.dp))
-                        Text("لا توجد نتائج مطابقة بعد", fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
+                        Text(if (hasActiveFilters) "لا يوجد عرض يحقق كل الشروط" else "لا توجد نتائج مطابقة بعد", fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(4.dp))
-                        Text("لم نجد سعرًا حيًا يطابق التواريخ والإشغال والشروط المطلوبة حاليًا.", color = Muted, style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            if (hasActiveFilters) "خفف أحد الفلاتر أو افتح الفلاتر لتعديل شروط الحجز."
+                            else "لم نجد سعرًا حيًا يطابق التواريخ والإشغال والشروط المطلوبة حاليًا.",
+                            color = Muted,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
                     }
                 }
             }
         } else {
-            item { Text("${sorted.size} فنادق • مرتبة حسب $sort", color = Muted, style = MaterialTheme.typography.bodyMedium) }
-            items(sorted, key = { it.id }) { hotel -> HotelDealCard(hotel = hotel, onClick = { onHotelClick(hotel) }) }
+            item { Text("${filteredRows.size} فنادق • مرتبة حسب $sort", color = Muted, style = MaterialTheme.typography.bodyMedium) }
+            items(filteredRows, key = { it.first.id }) { (hotel, bestMatching, filteredHotel) ->
+                HotelDealCard(
+                    hotel = hotel,
+                    bestOfferOverride = if (hasActiveFilters) bestMatching else null,
+                    onClick = { onHotelClick(filteredHotel) }
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun FilterSwitch(title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(18.dp)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(title, fontWeight = FontWeight.Bold)
+                Text(subtitle, color = Muted, style = MaterialTheme.typography.bodySmall)
+            }
+            Switch(checked = checked, onCheckedChange = onCheckedChange)
+        }
+    }
+}
+
+private fun isCancellable(offer: DealOffer): Boolean {
+    val value = offer.cancellation.lowercase()
+    return value.contains("قابل") || value.contains("مجاني") || value.contains("free") || value.contains("refundable")
+}
+
+private fun hasBreakfast(offer: DealOffer): Boolean {
+    val value = offer.meal.lowercase()
+    return value.contains("إفطار") || value.contains("افطار") || value.contains("breakfast")
 }
 
 @Composable
