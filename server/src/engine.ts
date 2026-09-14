@@ -10,7 +10,7 @@ function relatedLead(lead: DiscoveryLead, hotelName: string): boolean {
 
 export function buildSearchResponse(request: SearchRequest, providerResults: ProviderResult[], discoveries: DiscoveryLead[]): SearchResponse {
   const rules = loadPromotionRules();
-  const offers = providerResults.flatMap(r => r.offers).flatMap(o => [o, ...applyVerifiedPromotions(o, rules, request.cards)]);
+  const offers = providerResults.flatMap(r => r.offers).flatMap(o => [o, ...applyVerifiedPromotions(o, rules, request.cards, request)]);
   const groups = new Map<string, NormalizedOffer[]>();
   for (const offer of offers) {
     const key = hotelIdentityKey(offer.hotelName) || normalizeHotelText(offer.hotelName);
@@ -48,6 +48,6 @@ export function buildSearchResponse(request: SearchRequest, providerResults: Pro
     mode,
     providers: providerResults.map(r => ({name: r.provider, configured: r.configured, warning: r.warning, latencyMs: r.latencyMs})),
     hotels,
-    disclaimer: "السعر المؤكد مرتبط بوقت آخر تحقق وبنفس التواريخ والنزلاء والغرفة والشروط. نتائج اكتشاف الويب لا تُحتسب كتوفير حتى تُثبت شروطها ويُعاد فحص السعر."
+    disclaimer: "السعر المؤكد مرتبط بوقت آخر تحقق وبنفس التواريخ والنزلاء والغرفة والشروط. لا يُحتسب أي خصم إلا إذا كان من مصدر رسمي موثق وينطبق على فترة الحجز والإقامة والبطاقة والعملة وبلد المستخدم."
   };
 }

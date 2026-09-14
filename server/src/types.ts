@@ -1,5 +1,6 @@
 export type Verification = "LIVE_VERIFIED" | "DISCOVERED" | "UNVERIFIED";
 export type StrategyKind = "STANDARD" | "MEMBER" | "APP" | "CARD" | "PROMO" | "PACKAGE";
+export type PromotionSourceKind = "BANK" | "HOTEL" | "OTA" | "CARD_NETWORK" | "OFFICIAL_CAMPAIGN";
 
 export interface PaymentCardProfile { bank?: string; network?: string; tier?: string; country?: string; }
 export interface SearchRequest {
@@ -14,8 +15,12 @@ export interface NormalizedOffer {
   verifiedAt: string; matchPercent: number; requirements: string[];
 }
 export interface PromotionRule {
-  id: string; title: string; sourceUrl: string; verifiedAt: string; validFrom?: string; validUntil?: string; providers?: string[]; banks?: string[];
-  networks?: string[]; tiers?: string[]; minSpend?: number; percentOff?: number; flatOff?: number; maxDiscount?: number; code?: string;
+  id: string; title: string; sourceUrl: string; verifiedAt: string;
+  officialSource?: boolean; sourceKind?: PromotionSourceKind;
+  validFrom?: string; validUntil?: string; stayFrom?: string; stayUntil?: string;
+  providers?: string[]; banks?: string[]; networks?: string[]; tiers?: string[];
+  bookerCountries?: string[]; currencies?: string[]; minNights?: number; maxNights?: number;
+  minSpend?: number; percentOff?: number; flatOff?: number; maxDiscount?: number; code?: string;
   requiresApp?: boolean; requiresMembership?: boolean; stackable?: boolean;
 }
 export interface DiscoveryLead { title: string; url: string; description?: string; source: string; query: string; discoveredAt: string; verification: "DISCOVERED"; }
