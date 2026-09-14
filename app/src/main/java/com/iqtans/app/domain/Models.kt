@@ -12,7 +12,8 @@ data class DiscoveryHint(val title: String, val url: String, val source: String,
 data class DealOffer(
     val id: String, val source: String, val finalPrice: Int, val referencePrice: Int, val currency: String = "ر.س",
     val title: String, val method: String, val trust: PriceTrust, val matchPercent: Int, val lastChecked: String,
-    val cancellation: String, val meal: String, val paymentLabel: String = "حسب العرض", val conditions: List<String> = emptyList(), val steps: List<String> = emptyList(),
+    val cancellation: String, val meal: String, val paymentLabel: String = "حسب العرض", val comparisonReason: String? = null,
+    val conditions: List<String> = emptyList(), val steps: List<String> = emptyList(),
     val breakdown: List<Pair<String, Int>> = emptyList(), val cardRequirement: String? = null, val memberRequirement: String? = null,
     val cashbackLater: Int = 0, val bookingUrl: String? = null, val evidenceUrl: String? = null, val providerHotelId: String = "",
     val roomName: String? = null, val finalPriceExact: Double? = null, val referencePriceExact: Double? = null
