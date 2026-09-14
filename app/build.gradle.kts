@@ -3,6 +3,9 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val iqtansApiBaseUrl = providers.gradleProperty("IQTANS_API_BASE_URL").orElse("").get()
+val escapedApiBaseUrl = iqtansApiBaseUrl.replace("\\", "\\\\").replace("\"", "\\\"")
+
 android {
     namespace = "com.iqtans.app"
     compileSdk = 37
@@ -12,12 +15,16 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = "0.2.0"
 
         vectorDrawables { useSupportLibrary = true }
+        buildConfigField("String", "IQTANS_API_BASE_URL", "\"$escapedApiBaseUrl\"")
     }
 
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -40,6 +47,7 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

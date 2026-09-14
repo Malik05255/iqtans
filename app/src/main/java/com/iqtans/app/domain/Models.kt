@@ -1,9 +1,17 @@
 package com.iqtans.app.domain
 
+import java.time.LocalDate
+
 enum class PriceTrust {
     VERIFIED_LIVE,
     DISCOVERED,
     DEMO
+}
+
+enum class LiveSearchMode {
+    LIVE,
+    PARTIAL,
+    UNCONFIGURED
 }
 
 data class ReviewSource(
@@ -11,6 +19,13 @@ data class ReviewSource(
     val score: Double,
     val scale: Int,
     val count: Int
+)
+
+data class DiscoveryHint(
+    val title: String,
+    val url: String,
+    val source: String,
+    val description: String? = null
 )
 
 data class DealOffer(
@@ -31,7 +46,9 @@ data class DealOffer(
     val breakdown: List<Pair<String, Int>> = emptyList(),
     val cardRequirement: String? = null,
     val memberRequirement: String? = null,
-    val cashbackLater: Int = 0
+    val cashbackLater: Int = 0,
+    val bookingUrl: String? = null,
+    val evidenceUrl: String? = null
 ) {
     val savings: Int get() = (referencePrice - finalPrice).coerceAtLeast(0)
     val savingsPercent: Int get() = if (referencePrice <= 0) 0 else (savings * 100 / referencePrice)
@@ -50,20 +67,11 @@ data class HotelDeal(
     val offers: List<DealOffer>,
     val insight: String,
     val flexibilitySaving: Int = 0,
-    val flexibleDateLabel: String? = null
+    val flexibleDateLabel: String? = null,
+    val discoveries: List<DiscoveryHint> = emptyList()
 ) {
     val bestOffer: DealOffer get() = offers.minBy { it.finalPrice }
 }
-
-data class SearchRequest(
-    val city: String,
-    val hotelQuery: String = "",
-    val checkIn: String = "20 سبتمبر",
-    val checkOut: String = "23 سبتمبر",
-    val guests: Int = 2,
-    val rooms: Int = 1,
-    val flexibilityDays: Int = 1
-)
 
 data class UserPaymentCard(
     val id: String,
@@ -71,4 +79,21 @@ data class UserPaymentCard(
     val network: String,
     val tier: String,
     val isEnabled: Boolean = true
+)
+
+data class SearchRequest(
+    val city: String,
+    val hotelQuery: String = "",
+    val checkIn: String = LocalDate.now().plusDays(7).toString(),
+    val checkOut: String = LocalDate.now().plusDays(10).toString(),
+    val guests: Int = 2,
+    val rooms: Int = 1,
+    val flexibilityDays: Int = 1
+)
+
+data class LiveSearchEnvelope(
+    val hotels: List<HotelDeal>,
+    val mode: LiveSearchMode,
+    val warnings: List<String> = emptyList(),
+    val generatedAt: String = ""
 )
