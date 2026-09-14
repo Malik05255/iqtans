@@ -29,7 +29,10 @@ export interface ProviderResult { provider: string; configured: boolean; offers:
 export interface SearchProvider { readonly name: string; isConfigured(): boolean; search(request: SearchRequest): Promise<ProviderResult>; }
 export interface DiscoveryProvider { readonly name: string; isConfigured(): boolean; discover(request: SearchRequest, hotelNames: string[]): Promise<DiscoveryLead[]>; }
 export interface FlexibleDateOption { checkIn: string; checkOut: string; bestPrice: number; savings: number; dayShift: number; }
-export interface ReviewSummary { source: string; score: number; scale: number; count: number; }
+export interface ReviewSummary { source: string; score: number; scale: number; count: number; attribution?: string; sourceUrl?: string; }
+export interface ExternalReviewRecord { hotelName: string; review: ReviewSummary; }
+export interface ReviewProviderResult { provider: string; configured: boolean; reviews: ExternalReviewRecord[]; warning?: string; latencyMs: number; }
+export interface ReviewProvider { readonly name: string; isConfigured(): boolean; fetch(hotelNames: string[], city: string): Promise<ReviewProviderResult>; }
 export interface RankedHotel {
   key: string; name: string; city: string; baselinePrice: number; bestPrice: number; savings: number; savingsPercent: number;
   offers: NormalizedOffer[]; discoveries: DiscoveryLead[]; reviews?: ReviewSummary[]; flexible?: FlexibleDateOption;
@@ -40,6 +43,8 @@ export interface SearchCoverage {
   priceProvidersWithResults: number;
   liveOffers: number;
   discoveredLeads: number;
+  reviewProvidersConfigured?: number;
+  externalReviewSources?: number;
 }
 export interface SearchResponse {
   request: SearchRequest; generatedAt: string; mode: "live" | "partial" | "unconfigured";
