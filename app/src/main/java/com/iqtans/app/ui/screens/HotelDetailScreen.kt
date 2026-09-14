@@ -24,12 +24,14 @@ import com.iqtans.app.ui.theme.*
 fun HotelDetailScreen(hotel: HotelDeal, watched: Boolean, onBack: () -> Unit, onToggleWatch: () -> Unit, onOfferClick: (DealOffer) -> Unit) {
     val best = hotel.bestOffer
     val uriHandler = LocalUriHandler.current
-    val verifiedBySource = hotel.offers
-        .filter { it.trust == PriceTrust.VERIFIED_LIVE && it.matchPercent == 100 }
+    val verifiedOffers = hotel.offers.filter { it.trust == PriceTrust.VERIFIED_LIVE && it.matchPercent == 100 }
+    val verifiedBySource = verifiedOffers
         .groupBy { it.source }
         .mapValues { (_, offers) -> offers.minBy { it.finalAmount } }
         .values
         .sortedBy { it.finalAmount }
+    val cancellationUpgrade = findCancellationUpgrade(best, verifiedOffers)
+    val breakfastUpgrade = findBreakfastUpgrade(best, verifiedOffers)
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 42.dp, bottom = 42.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
@@ -55,6 +57,17 @@ fun HotelDetailScreen(hotel: HotelDeal, watched: Boolean, onBack: () -> Unit, on
         }
 
         item { PriceConfidenceCard(verifiedBySource, best.currency) }
+
+        if (cancellationUpgrade != null || breakfastUpgrade != null) {
+            item {
+                SmartUpgradeCard(
+                    best = best,
+                    cancellationUpgrade = cancellationUpgrade,
+                    breakfastUpgrade = breakfastUpgrade,
+                    onOfferClick = onOfferClick
+                )
+            }
+        }
 
         item { Surface(color = SoftSand, shape = RoundedCornerShape(22.dp)) { Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) { Icon(Icons.Rounded.Lightbulb, null, tint = Night); Spacer(Modifier.width(11.dp)); Column { Text("معلومة قد لا تعرفها", color = Night, fontWeight = FontWeight.Black); Text(hotel.insight, color = Night.copy(alpha = .76f), style = MaterialTheme.typography.bodyMedium) } } } }
         if (hotel.flexibilitySavingAmount > 0.0 && hotel.flexibleDateLabel != null) item { Surface(color = SoftMint, shape = RoundedCornerShape(22.dp)) { Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Surface(color = androidx.compose.ui.graphics.Color.White, shape = RoundedCornerShape(13.dp)) { Icon(Icons.Rounded.EventRepeat, null, tint = Emerald, modifier = Modifier.padding(10.dp)) }; Spacer(Modifier.width(11.dp)); Column(Modifier.weight(1f)) { Text("مرن؟ يمكنك توفير أكثر", fontWeight = FontWeight.Black, color = Ink); Text("${hotel.flexibleDateLabel} يوفر ${formatMoney(hotel.flexibilitySavingAmount)} ${best.currency} على نفس مدة الإقامة.", color = Muted, style = MaterialTheme.typography.bodyMedium) } } } }
@@ -85,6 +98,50 @@ fun HotelDetailScreen(hotel: HotelDeal, watched: Boolean, onBack: () -> Unit, on
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SmartUpgradeCard(best: DealOffer, cancellationUpgrade: DealOffer?, breakfastUpgrade: DealOffer?, onOfferClick: (DealOffer) -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(22.dp)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(color = SoftMint, shape = RoundedCornerShape(12.dp)) { Icon(Icons.Rounded.AutoAwesome, null, tint = Emerald, modifier = Modifier.padding(9.dp)) }
+                Spacer(Modifier.width(10.dp))
+                Column {
+                    Text("ترقية ذكية للحجز", fontWeight = FontWeight.Black, color = Ink)
+                    Text("نفس الغرفة ونفس باقي الشروط؛ نريك فقط قيمة إضافية بفارق سعر محدود.", color = Muted, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            cancellationUpgrade?.let { candidate ->
+                UpgradeRow(
+                    icon = Icons.Rounded.EventAvailable,
+                    title = "إلغاء أكثر مرونة",
+                    text = "أضف ${formatMoney(candidate.finalAmount - best.finalAmount)} ${best.currency} فقط للحصول على ${candidate.cancellation}.",
+                    onClick = { onOfferClick(candidate) }
+                )
+            }
+            breakfastUpgrade?.let { candidate ->
+                UpgradeRow(
+                    icon = Icons.Rounded.Restaurant,
+                    title = "إفطار مشمول",
+                    text = "أضف ${formatMoney(candidate.finalAmount - best.finalAmount)} ${best.currency} فقط للحصول على ${candidate.meal}.",
+                    onClick = { onOfferClick(candidate) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpgradeRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, text: String, onClick: () -> Unit) {
+    Card(onClick = onClick, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .55f))) {
+        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = Emerald, modifier = Modifier.size(21.dp))
+            Spacer(Modifier.width(9.dp))
+            Column(Modifier.weight(1f)) { Text(title, fontWeight = FontWeight.Bold); Text(text, color = Muted, style = MaterialTheme.typography.bodyMedium) }
+            Icon(Icons.Rounded.ChevronLeft, null, tint = Muted)
         }
     }
 }
@@ -135,4 +192,42 @@ private fun OfferRow(offer: DealOffer, onClick: () -> Unit) {
             Spacer(Modifier.height(10.dp)); Row(verticalAlignment = Alignment.CenterVertically) { TrustChip(offer.trust); Spacer(Modifier.width(7.dp)); Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(999.dp)) { Text("تطابق ${offer.matchPercent}%", modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp), style = MaterialTheme.typography.labelMedium, color = Muted) } }
         }
     }
+}
+
+private fun findCancellationUpgrade(best: DealOffer, offers: List<DealOffer>): DealOffer? {
+    if (isCancellable(best)) return null
+    val limit = maxOf(75.0, best.finalAmount * 0.12)
+    return offers.asSequence()
+        .filter { it.id != best.id && isCancellable(it) }
+        .filter { sameRoom(it, best) && sameMeal(it, best) && it.paymentLabel == best.paymentLabel }
+        .filter { it.finalAmount >= best.finalAmount - 0.009 && it.finalAmount - best.finalAmount <= limit }
+        .minByOrNull { it.finalAmount }
+}
+
+private fun findBreakfastUpgrade(best: DealOffer, offers: List<DealOffer>): DealOffer? {
+    if (hasBreakfast(best)) return null
+    val limit = maxOf(75.0, best.finalAmount * 0.12)
+    return offers.asSequence()
+        .filter { it.id != best.id && hasBreakfast(it) }
+        .filter { sameRoom(it, best) && it.cancellation.equals(best.cancellation, ignoreCase = true) && it.paymentLabel == best.paymentLabel }
+        .filter { it.finalAmount >= best.finalAmount - 0.009 && it.finalAmount - best.finalAmount <= limit }
+        .minByOrNull { it.finalAmount }
+}
+
+private fun sameRoom(a: DealOffer, b: DealOffer): Boolean {
+    val left = a.roomName?.trim()?.lowercase().orEmpty()
+    val right = b.roomName?.trim()?.lowercase().orEmpty()
+    return left.isNotBlank() && left == right
+}
+
+private fun sameMeal(a: DealOffer, b: DealOffer): Boolean = a.meal.trim().equals(b.meal.trim(), ignoreCase = true)
+
+private fun isCancellable(offer: DealOffer): Boolean {
+    val value = offer.cancellation.lowercase()
+    return value.contains("قابل") || value.contains("مجاني") || value.contains("free") || value.contains("refundable")
+}
+
+private fun hasBreakfast(offer: DealOffer): Boolean {
+    val value = offer.meal.lowercase()
+    return value.contains("إفطار") || value.contains("افطار") || value.contains("breakfast")
 }
