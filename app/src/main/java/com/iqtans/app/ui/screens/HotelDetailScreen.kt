@@ -64,7 +64,28 @@ fun HotelDetailScreen(hotel: HotelDeal, watched: Boolean, onBack: () -> Unit, on
         }
         item { SectionTitle("كل طرق الحجز", "الترتيب حسب التكلفة النهائية، لا نسبة الخصم الدعائية.") }
         items(hotel.offers.sortedBy { it.finalAmount }, key = { it.id }) { offer -> OfferRow(offer) { onOfferClick(offer) } }
-        if (hotel.reviewSources.isNotEmpty()) item { SectionTitle("التقييم من مصادره", "المصدر وعدد المراجعات ظاهر بدل رقم مجهول."); Spacer(Modifier.height(10.dp)); hotel.reviewSources.forEach { review -> Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(17.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Text(review.source, modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold); Icon(Icons.Rounded.Star, null, tint = Sand, modifier = Modifier.size(17.dp)); Text(" ${review.score}/${review.scale}", fontWeight = FontWeight.Black); Text(" • ${review.count}", color = Muted, style = MaterialTheme.typography.bodyMedium) } } } }
+        if (hotel.reviewSources.isNotEmpty()) item {
+            SectionTitle("التقييم من مصادره", "كل تقييم ظاهر بمصدره وعدد المراجعات، والمصادر الخارجية تحمل attribution ورابطها.")
+            Spacer(Modifier.height(10.dp))
+            hotel.reviewSources.forEach { review ->
+                Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(17.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(review.source, fontWeight = FontWeight.Bold)
+                            review.attribution?.let { Text("المصدر: $it", color = Muted, style = MaterialTheme.typography.labelMedium) }
+                        }
+                        Icon(Icons.Rounded.Star, null, tint = Sand, modifier = Modifier.size(17.dp))
+                        Text(" ${review.score}/${review.scale}", fontWeight = FontWeight.Black)
+                        Text(" • ${review.count}", color = Muted, style = MaterialTheme.typography.bodyMedium)
+                        review.sourceUrl?.let { url ->
+                            IconButton(onClick = { runCatching { uriHandler.openUri(url) } }) {
+                                Icon(Icons.Rounded.OpenInNew, "فتح مصدر التقييم", tint = Emerald, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
