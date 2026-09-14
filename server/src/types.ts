@@ -109,6 +109,14 @@ export interface DiscoveryProvider {
   discover(request: SearchRequest, hotelNames: string[]): Promise<DiscoveryLead[]>;
 }
 
+export interface FlexibleDateOption {
+  checkIn: string;
+  checkOut: string;
+  bestPrice: number;
+  savings: number;
+  dayShift: number;
+}
+
 export interface RankedHotel {
   key: string;
   name: string;
@@ -119,6 +127,7 @@ export interface RankedHotel {
   savingsPercent: number;
   offers: NormalizedOffer[];
   discoveries: DiscoveryLead[];
+  flexible?: FlexibleDateOption;
 }
 
 export interface SearchResponse {

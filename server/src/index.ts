@@ -1,9 +1,10 @@
 import { createServer } from "node:http";
 import { buildSearchResponse } from "./engine.js";
+import { attachBestFlexibleDate, shiftedRequest } from "./flexibility.js";
 import { BookingDemandProvider } from "./providers/booking.js";
 import { ExpediaRapidProvider } from "./providers/expedia.js";
 import { BraveOfferDiscovery } from "./providers/brave.js";
-import type { SearchRequest } from "./types.js";
+import type { SearchRequest, SearchResponse } from "./types.js";
 
 const providers = [new BookingDemandProvider(), new ExpediaRapidProvider()];
 const discovery = new BraveOfferDiscovery();
@@ -24,7 +25,28 @@ function validate(r: SearchRequest): string | null {
   if (new Date(r.checkOut) <= new Date(r.checkIn)) return "checkOut must be after checkIn";
   if (!(r.adults >= 1 && r.adults <= 30)) return "adults out of range";
   if (!(r.rooms >= 1 && r.rooms <= 8)) return "rooms out of range";
+  if ((r.flexibilityDays ?? 0) < 0 || (r.flexibilityDays ?? 0) > 3) return "flexibilityDays must be between 0 and 3";
   return null;
+}
+
+async function supplierSearch(request: SearchRequest): Promise<SearchResponse> {
+  const settled = await Promise.all(providers.map(p => p.search(request)));
+  return buildSearchResponse(request, settled, []);
+}
+
+async function flexibleSearches(request: SearchRequest): Promise<SearchResponse[]> {
+  const days = Math.min(3, Math.max(0, Math.trunc(request.flexibilityDays ?? 0)));
+  if (!days) return [];
+  const offsets: number[] = [];
+  for (let n = 1; n <= days; n++) offsets.push(-n, n);
+  const output: SearchResponse[] = [];
+  // Keep supplier pressure predictable: at most two date windows are queried concurrently.
+  for (let i = 0; i < offsets.length; i += 2) {
+    const batch = offsets.slice(i, i + 2);
+    const results = await Promise.all(batch.map(offset => supplierSearch(shiftedRequest(request, offset))));
+    output.push(...results);
+  }
+  return output;
 }
 
 const server = createServer(async (req, res) => {
@@ -41,10 +63,15 @@ const server = createServer(async (req, res) => {
       if (problem) return json(res, 400, {error: problem});
       request.bookerCountry ||= "sa";
       request.currency ||= "SAR";
-      const settled = await Promise.all(providers.map(p => p.search(request)));
-      const names = [...new Set(settled.flatMap(r => r.offers.map(o => o.hotelName)))];
-      const leads = await discovery.discover(request, names);
-      return json(res, 200, buildSearchResponse(request, settled, leads));
+
+      const exactSettled = await Promise.all(providers.map(p => p.search(request)));
+      const names = [...new Set(exactSettled.flatMap(r => r.offers.map(o => o.hotelName)))];
+      const [leads, alternatives] = await Promise.all([
+        discovery.discover(request, names),
+        flexibleSearches(request)
+      ]);
+      const exact = buildSearchResponse(request, exactSettled, leads);
+      return json(res, 200, attachBestFlexibleDate(exact, alternatives));
     }
     return json(res, 404, {error: "not found"});
   } catch (error) {
