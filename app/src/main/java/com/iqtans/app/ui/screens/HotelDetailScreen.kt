@@ -22,7 +22,15 @@ import com.iqtans.app.ui.theme.*
 
 @Composable
 fun HotelDetailScreen(hotel: HotelDeal, watched: Boolean, onBack: () -> Unit, onToggleWatch: () -> Unit, onOfferClick: (DealOffer) -> Unit) {
-    val best = hotel.bestOffer; val uriHandler = LocalUriHandler.current
+    val best = hotel.bestOffer
+    val uriHandler = LocalUriHandler.current
+    val verifiedBySource = hotel.offers
+        .filter { it.trust == PriceTrust.VERIFIED_LIVE && it.matchPercent == 100 }
+        .groupBy { it.source }
+        .mapValues { (_, offers) -> offers.minBy { it.finalAmount } }
+        .values
+        .sortedBy { it.finalAmount }
+
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 42.dp, bottom = 42.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) { IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowForwardIos, "رجوع") }; Spacer(Modifier.weight(1f)); IconButton(onClick = onToggleWatch) { Icon(if (watched) Icons.Rounded.NotificationsActive else Icons.Rounded.NotificationsNone, "مراقبة السعر", tint = if (watched) Emerald else MaterialTheme.colorScheme.onBackground) } }
@@ -45,6 +53,9 @@ fun HotelDetailScreen(hotel: HotelDeal, watched: Boolean, onBack: () -> Unit, on
                 }
             }
         }
+
+        item { PriceConfidenceCard(verifiedBySource, best.currency) }
+
         item { Surface(color = SoftSand, shape = RoundedCornerShape(22.dp)) { Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) { Icon(Icons.Rounded.Lightbulb, null, tint = Night); Spacer(Modifier.width(11.dp)); Column { Text("معلومة قد لا تعرفها", color = Night, fontWeight = FontWeight.Black); Text(hotel.insight, color = Night.copy(alpha = .76f), style = MaterialTheme.typography.bodyMedium) } } } }
         if (hotel.flexibilitySavingAmount > 0.0 && hotel.flexibleDateLabel != null) item { Surface(color = SoftMint, shape = RoundedCornerShape(22.dp)) { Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Surface(color = androidx.compose.ui.graphics.Color.White, shape = RoundedCornerShape(13.dp)) { Icon(Icons.Rounded.EventRepeat, null, tint = Emerald, modifier = Modifier.padding(10.dp)) }; Spacer(Modifier.width(11.dp)); Column(Modifier.weight(1f)) { Text("مرن؟ يمكنك توفير أكثر", fontWeight = FontWeight.Black, color = Ink); Text("${hotel.flexibleDateLabel} يوفر ${formatMoney(hotel.flexibilitySavingAmount)} ${best.currency} على نفس مدة الإقامة.", color = Muted, style = MaterialTheme.typography.bodyMedium) } } } }
         if (hotel.discoveries.isNotEmpty()) {
@@ -54,6 +65,41 @@ fun HotelDetailScreen(hotel: HotelDeal, watched: Boolean, onBack: () -> Unit, on
         item { SectionTitle("كل طرق الحجز", "الترتيب حسب التكلفة النهائية، لا نسبة الخصم الدعائية.") }
         items(hotel.offers.sortedBy { it.finalAmount }, key = { it.id }) { offer -> OfferRow(offer) { onOfferClick(offer) } }
         if (hotel.reviewSources.isNotEmpty()) item { SectionTitle("التقييم من مصادره", "المصدر وعدد المراجعات ظاهر بدل رقم مجهول."); Spacer(Modifier.height(10.dp)); hotel.reviewSources.forEach { review -> Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(17.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Text(review.source, modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold); Icon(Icons.Rounded.Star, null, tint = Sand, modifier = Modifier.size(17.dp)); Text(" ${review.score}/${review.scale}", fontWeight = FontWeight.Black); Text(" • ${review.count}", color = Muted, style = MaterialTheme.typography.bodyMedium) } } } }
+    }
+}
+
+@Composable
+private fun PriceConfidenceCard(offers: List<DealOffer>, currency: String) {
+    val sourceCount = offers.size
+    val label = when {
+        sourceCount >= 3 -> "ثقة مقارنة قوية"
+        sourceCount == 2 -> "ثقة مقارنة جيدة"
+        sourceCount == 1 -> "مقارنة محدودة"
+        else -> "لا توجد مقارنة حية مكتملة"
+    }
+    val strong = sourceCount >= 2
+    val first = offers.getOrNull(0)
+    val second = offers.getOrNull(1)
+    val gap = if (first != null && second != null) (second.finalAmount - first.finalAmount).coerceAtLeast(0.0) else null
+
+    Surface(color = if (strong) SoftMint else SoftSand, shape = RoundedCornerShape(22.dp)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(if (strong) Icons.Rounded.FactCheck else Icons.Rounded.Info, null, tint = if (strong) Emerald else Night)
+                Spacer(Modifier.width(9.dp))
+                Text(label, fontWeight = FontWeight.Black, color = if (strong) Emerald else Night)
+            }
+            when {
+                sourceCount >= 2 && first != null && second != null -> {
+                    Text("وجد اقتنص أسعارًا مطابقة 100% من $sourceCount مصادر حية مختلفة.", color = Ink, style = MaterialTheme.typography.bodyMedium)
+                    Text("الأرخص: ${first.source} بـ ${formatMoney(first.finalAmount)} $currency • التالي ${second.source} أعلى بـ ${formatMoney(gap ?: 0.0)} $currency", color = Muted, style = MaterialTheme.typography.bodyMedium)
+                }
+                sourceCount == 1 && first != null -> {
+                    Text("لدينا مصدر حي مطابق واحد فقط (${first.source}). نعرض السعر، لكن لا نصفه بأنه أفضل سعر في السوق حتى تتوفر مقارنة إضافية.", color = Night, style = MaterialTheme.typography.bodyMedium)
+                }
+                else -> Text("لا توجد حاليًا عروض حية بتطابق 100% تكفي لبناء مقارنة موثوقة بين المصادر.", color = Night, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
     }
 }
 
