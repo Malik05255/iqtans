@@ -2,31 +2,11 @@ package com.iqtans.app.domain
 
 import java.time.LocalDate
 
-enum class PriceTrust {
-    VERIFIED_LIVE,
-    DISCOVERED,
-    DEMO
-}
+enum class PriceTrust { VERIFIED_LIVE, DISCOVERED, DEMO }
+enum class LiveSearchMode { LIVE, PARTIAL, UNCONFIGURED }
 
-enum class LiveSearchMode {
-    LIVE,
-    PARTIAL,
-    UNCONFIGURED
-}
-
-data class ReviewSource(
-    val source: String,
-    val score: Double,
-    val scale: Int,
-    val count: Int
-)
-
-data class DiscoveryHint(
-    val title: String,
-    val url: String,
-    val source: String,
-    val description: String? = null
-)
+data class ReviewSource(val source: String, val score: Double, val scale: Int, val count: Int)
+data class DiscoveryHint(val title: String, val url: String, val source: String, val description: String? = null)
 
 data class DealOffer(
     val id: String,
@@ -48,7 +28,9 @@ data class DealOffer(
     val memberRequirement: String? = null,
     val cashbackLater: Int = 0,
     val bookingUrl: String? = null,
-    val evidenceUrl: String? = null
+    val evidenceUrl: String? = null,
+    val providerHotelId: String = "",
+    val roomName: String? = null
 ) {
     val savings: Int get() = (referencePrice - finalPrice).coerceAtLeast(0)
     val savingsPercent: Int get() = if (referencePrice <= 0) 0 else (savings * 100 / referencePrice)
@@ -69,17 +51,9 @@ data class HotelDeal(
     val flexibilitySaving: Int = 0,
     val flexibleDateLabel: String? = null,
     val discoveries: List<DiscoveryHint> = emptyList()
-) {
-    val bestOffer: DealOffer get() = offers.minBy { it.finalPrice }
-}
+) { val bestOffer: DealOffer get() = offers.minBy { it.finalPrice } }
 
-data class UserPaymentCard(
-    val id: String,
-    val bank: String,
-    val network: String,
-    val tier: String,
-    val isEnabled: Boolean = true
-)
+data class UserPaymentCard(val id: String, val bank: String, val network: String, val tier: String, val isEnabled: Boolean = true)
 
 data class SearchRequest(
     val city: String,
@@ -91,9 +65,14 @@ data class SearchRequest(
     val flexibilityDays: Int = 1
 )
 
-data class LiveSearchEnvelope(
-    val hotels: List<HotelDeal>,
-    val mode: LiveSearchMode,
-    val warnings: List<String> = emptyList(),
-    val generatedAt: String = ""
+data class LiveSearchEnvelope(val hotels: List<HotelDeal>, val mode: LiveSearchMode, val warnings: List<String> = emptyList(), val generatedAt: String = "")
+
+data class OfferVerification(
+    val available: Boolean,
+    val expectedPrice: Int,
+    val currentPrice: Int? = null,
+    val changed: Boolean = false,
+    val verifiedAt: String = "",
+    val bookingUrl: String? = null,
+    val reason: String? = null
 )
