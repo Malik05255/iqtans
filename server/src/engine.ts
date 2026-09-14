@@ -1,6 +1,6 @@
 import { applyVerifiedPromotions, loadPromotionRules } from "./promotions.js";
 import { hotelIdentityKey, hotelNameTokens, normalizeHotelText } from "./hotelIdentity.js";
-import type { DiscoveryLead, NormalizedOffer, ProviderResult, RankedHotel, ReviewSummary, SearchRequest, SearchResponse } from "./types.js";
+import type { DiscoveryLead, ExternalReviewRecord, NormalizedOffer, ProviderResult, RankedHotel, ReviewSummary, SearchRequest, SearchResponse } from "./types.js";
 
 function relatedLead(lead: DiscoveryLead, hotelName: string): boolean {
   const tokens = hotelNameTokens(hotelName).filter(t => t.length > 2);
@@ -46,6 +46,20 @@ export function collectReviewSummaries(input: NormalizedOffer[]): ReviewSummary[
   return [...bySource.values()].sort((a, b) => b.count - a.count || b.score / b.scale - a.score / a.scale);
 }
 
+function mergeReviewSummaries(items: ReviewSummary[]): ReviewSummary[] {
+  const bySource = new Map<string, ReviewSummary>();
+  for (const item of items) {
+    if (!(item.score > 0) || !(item.scale > 0)) continue;
+    const previous = bySource.get(item.source);
+    if (!previous || item.count > previous.count) bySource.set(item.source, item);
+  }
+  return [...bySource.values()].sort((a, b) => b.count - a.count || b.score / b.scale - a.score / a.scale);
+}
+
+function reviewKey(name: string): string {
+  return hotelIdentityKey(name) || normalizeHotelText(name);
+}
+
 export function withFairComparisonPrices(input: NormalizedOffer[]): NormalizedOffer[] {
   const groups = new Map<string, NormalizedOffer[]>();
   for (const offer of input) {
@@ -68,7 +82,13 @@ export function withFairComparisonPrices(input: NormalizedOffer[]): NormalizedOf
   });
 }
 
-export function buildSearchResponse(request: SearchRequest, providerResults: ProviderResult[], discoveries: DiscoveryLead[]): SearchResponse {
+export function buildSearchResponse(
+  request: SearchRequest,
+  providerResults: ProviderResult[],
+  discoveries: DiscoveryLead[],
+  externalReviews: ExternalReviewRecord[] = [],
+  reviewProvidersConfigured = 0
+): SearchResponse {
   const rules = loadPromotionRules();
   const rawOffers = providerResults.flatMap(r => r.offers).flatMap(o => [o, ...applyVerifiedPromotions(o, rules, request.cards, request)]);
   const offers = withFairComparisonPrices(rawOffers);
@@ -86,6 +106,7 @@ export function buildSearchResponse(request: SearchRequest, providerResults: Pro
     const baseline = winner?.comparisonPrice ?? winner?.totalPrice ?? 0;
     const best = winner?.totalPrice ?? baseline;
     const savings = Math.max(0, baseline - best);
+    const externalForHotel = externalReviews.filter(item => reviewKey(item.hotelName) === key).map(item => item.review);
     return {
       key,
       name: winner.hotelName,
@@ -95,7 +116,7 @@ export function buildSearchResponse(request: SearchRequest, providerResults: Pro
       savings,
       savingsPercent: baseline > 0 ? Math.round(savings * 100 / baseline) : 0,
       offers: sorted,
-      reviews: collectReviewSummaries(sorted),
+      reviews: mergeReviewSummaries([...collectReviewSummaries(sorted), ...externalForHotel]),
       discoveries: discoveries.filter(d => relatedLead(d, winner.hotelName)).slice(0, 12)
     };
   }).sort((a, b) => a.bestPrice - b.bestPrice);
@@ -115,9 +136,11 @@ export function buildSearchResponse(request: SearchRequest, providerResults: Pro
       priceProvidersConfigured: configured.length,
       priceProvidersWithResults: providerResults.filter(r => r.configured && r.offers.length > 0).length,
       liveOffers,
-      discoveredLeads: discoveries.length
+      discoveredLeads: discoveries.length,
+      reviewProvidersConfigured,
+      externalReviewSources: new Set(externalReviews.map(item => item.review.source)).size
     },
     hotels,
-    disclaimer: "السعر المؤكد مرتبط بوقت آخر تحقق وبنفس التواريخ والنزلاء والغرفة والشروط. رقم «وفّرت» لا يُحسب إلا مقابل خط أساس مطابق للغرفة والوجبة وسياسة الإلغاء وطريقة الدفع، والعروض الرسمية يجب أن تطابق شروط الإقامة والبطاقة والعملة وبلد المستخدم."
+    disclaimer: "السعر المؤكد مرتبط بوقت آخر تحقق وبنفس التواريخ والنزلاء والغرفة والشروط. رقم «وفّرت» لا يُحسب إلا مقابل خط أساس مطابق للغرفة والوجبة وسياسة الإلغاء وطريقة الدفع، والعروض الرسمية يجب أن تطابق شروط الإقامة والبطاقة والعملة وبلد المستخدم. التقييمات الخارجية تُعرض مع مصدرها ونسبة القياس الخاصة بها."
   };
 }
